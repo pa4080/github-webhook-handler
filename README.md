@@ -178,32 +178,88 @@ You can trigger this webhook from GitHub Actions using the [Workflow Webhook Act
 
 ## Repository Configuration
 
-### Repository Detection
+All repository configurations are stored in a single file located at `repos/config.json`. Example configuration:
 
-The webhook automatically extracts the repository information from the webhook payload:
-
-1. For each incoming webhook, the application reads the `repository` field from the payload (format: `owner/repo`, e.g., `pa4080/exc.js-marker-detector`).
-2. The repository URL is automatically constructed as either:
-   - HTTPS URL: `https://github.com/{owner}/{repo}`
-   - SSH URL: `git@github.com:{owner}/{repo}`
-3. The URL type (HTTPS/SSH) is controlled by the `USE_SSH` environment variable.
-
-### Deployment Commands
-
-To set up deployment commands for repositories:
-
+```json
+{
+    "repository.name.1": {
+        "branch": "main",
+        "commands": [
+            "pnpm install",
+            "pnpm build",
+            "pnpm docker:build",
+            "pnpm docker:deploy"
+        ],
+        "package_manager": "pnpm",
+        "ssh_key_path": "/path/to/your/ssh/private/key",
+        "ssh_key_passphrase": "optional_passphrase_if_your_key_has_one",
+        "repo_supported_events": ["push", "pull_request", "ping"],
+        "env_vars": {
+            "NODE_ENV": "production",
+            "PORT": "3000"
+        },
+        "pre_deploy_commands": ["pnpm install", "pnpm build"],
+        "post_deploy_commands": ["pnpm restart"],
+        "notifications": {
+            "slack_webhook": "https://hooks.slack.com/services/...",
+            "email": "devops@example.com"
+        },
+        "health_check_url": "https://example.com/health",
+        "timeout": 300,
+        "max_retries": 3,
+        "retry_delay": 30
+    },
+    "repository.name.2": {
+        "branch": "main",
+        "commands": [
+            "npm install",
+            "npm run build",
+            "npm run deploy"
+        ],
+        "package_manager": "npm",
+        "repo_supported_events": ["push"],
+        "env_vars": {
+            "NODE_ENV": "production"
+        },
+        "pre_deploy_commands": ["npm install"],
+        "post_deploy_commands": ["npm run start"],
+        "health_check_url": "https://example2.com/health",
+        "timeout": 600,
+        "max_retries": 5,
+        "retry_delay": 60
+    }
+}
 ```
-# Format: REPO_[repository_name]_COMMAND=deployment_command
-REPO_MARKER_DETECTOR_COMMAND="cd /path/to/deployment && git pull && npm install && npm run build"
-```
 
-The application will try to match the repository name from the payload to find the correct deployment command using several formats:
+Configuration Options:
 
-1. Exact name: `REPO_reponame_COMMAND`
-2. Uppercase: `REPO_REPONAME_COMMAND`
-3. With underscores: `REPO_repo_name_COMMAND` (for repos with hyphens)
+- `branch`: The branch to deploy from (default: main)
+- `command`: Single deployment command to run (deprecated, use `commands` array instead)
+- `commands`: Array of deployment commands to run in sequence
+- `package_manager`: Package manager to use (npm, pnpm, yarn)
+- `ssh_key_path`: Path to SSH private key for private repos
+- `ssh_key_passphrase`: Passphrase for SSH key (if needed)
+- `repo_supported_events`: Events to process (default: push, pull_request, ping)
+- `env_vars`: Environment variables to set
+- `pre_deploy_commands`: Commands to run before deployment
+- `post_deploy_commands`: Commands to run after deployment
+- `notifications`: Notification settings (Slack, email)
+- `health_check_url`: URL to check after deployment
+- `timeout`: Deployment timeout in seconds
+- `max_retries`: Maximum retry attempts
+- `retry_delay`: Delay between retries in seconds
 
-If no matching command is found, the repository will still be cloned/pulled but no deployment will run.
+## Environment Variables
+
+The application uses the following environment variables:
+
+- `PORT`: Port to listen on (default: 3000)
+- `WEBHOOK_SECRET`: Secret key for webhook signature verification
+- `USE_SSH`: Set to 'true' to use SSH for cloning (default: false)
+- `SSH_PRIVATE_KEY_PATH`: Path to SSH private key for private repos
+- `SSH_KEY_PASSPHRASE`: Passphrase for SSH key (if needed)
+
+Note: All repository-specific configurations should be placed in the `repos/config.json` file. See [app-repos.config.json](cci:7://file:///home/pa4080/git/webhook/app-repos.config.json:0:0-0:0) for an example configuration template.
 
 ## Security Considerations
 

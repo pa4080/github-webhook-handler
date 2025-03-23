@@ -1,33 +1,40 @@
-import express, { Express, Request, Response, NextFunction } from 'express';
-import bodyParser from 'body-parser';
-import fs from 'fs';
-import path from 'path';
-import { PORT } from './config';
-import routes from './routes';
+import express from 'express';
+import dotenv from 'dotenv';
+import { verifySignature } from './utils/webhook';
+import { handleWebhook } from './controllers/webhook';
+import { APP_SUPPORTED_EVENTS } from './config';
 
-// Create Express application
-const app: Express = express();
+// Load environment variables
+dotenv.config();
 
-// Standard middleware for JSON parsing with raw body capture
-app.use(bodyParser.json({
-  verify: (req: Request & { rawBody?: string }, res: Response, buf: Buffer) => {
-    // Capture raw body for signature verification
-    req.rawBody = buf.toString();
-  }
-}));
+// Create Express app
+const app = express();
 
+// Middleware to capture raw body for webhook signature verification
+app.use('/webhook', (req: express.Request & { rawBody?: string }, res: express.Response, next: express.NextFunction) => {
+  let rawBody = '';
+  req.setEncoding('utf8');
+  req.on('data', (chunk) => { rawBody += chunk; });
+  req.on('end', () => {
+    req.rawBody = rawBody;
+    next();
+  });
+});
 
-// Mount routes
-app.use('/', routes);
+// JSON parsing middleware
+app.use(express.json());
 
-// Create repos directory if it doesn't exist
-const reposDir = path.join(process.cwd(), 'repos');
-if (!fs.existsSync(reposDir)) {
-  fs.mkdirSync(reposDir, { recursive: true });
-}
+// Webhook route
+app.post('/webhook', handleWebhook);
 
-// Start the server
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.status(200).send('OK');
+});
+
+// Start server
+const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 app.listen(PORT, () => {
-  console.log(`Webhook server listening on port ${PORT}`);
-  console.log(`Health check available at http://localhost:${PORT}/health`);
+  console.log(`Server is running on port ${PORT}`);
+  console.log(`Supported events: ${APP_SUPPORTED_EVENTS.join(', ')}`);
 });

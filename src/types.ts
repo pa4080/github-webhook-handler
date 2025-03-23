@@ -3,13 +3,13 @@
 // Webhook payload structure following GitHub's webhook format
 export interface WebhookPayload {
   // Common fields that we use
-  event: string;          // Set from X-GitHub-Event header
+  event?: string;          // Set from X-GitHub-Event header
   
   // Repository information (GitHub format)
   repository?: {
     full_name: string;     // Repository name in 'owner/repo' format
-    name?: string;         // Repository name without owner
-    owner?: {
+    name: string;         // Repository name without owner
+    owner: {
       login: string;       // Repository owner username
     };
     html_url?: string;     // Repository URL
@@ -27,8 +27,13 @@ export interface WebhookPayload {
   // Push event specific fields
   head_commit?: {
     id: string;            // Commit SHA
-    message?: string;      // Commit message
+    message: string;      // Commit message
     timestamp?: string;    // Commit timestamp
+    author: {
+      username: string;
+      name: string;
+    };
+    modified: string[];
     [key: string]: any;    // Other commit properties
   };
   
@@ -39,7 +44,10 @@ export interface WebhookPayload {
     title: string;         // Title of the pull request
     body?: string;         // Description of the pull request
     state: string;         // 'open', 'closed'
-    merged?: boolean;      // Whether the PR was merged
+    merged: boolean;      // Whether the PR was merged
+    user: {
+      login: string;
+    };
     head: {
       ref: string;         // Source branch
       sha: string;         // Source commit hash
@@ -56,10 +64,28 @@ export interface WebhookPayload {
   [key: string]: any;      // Allow for additional properties
 }
 
+// Repository configuration interface
+export interface RepoConfig {
+  branch: string;
+  command?: string;
+  commands?: string[];
+  package_manager?: string;
+  ssh_key_path?: string;
+  ssh_key_passphrase?: string;
+  repo_supported_events?: string[];
+  env_vars?: Record<string, string>;
+  pre_deploy_commands?: string[];
+  post_deploy_commands?: string[];
+  notifications?: {
+    slack_webhook?: string;
+    email?: string;
+  };
+  health_check_url?: string;
+  timeout?: number;
+  max_retries?: number;
+  retry_delay?: number;
+}
 
-
-// Git configuration structure
-export interface GitConfig {
-  privateKey?: string;
-  passphrase?: string;
+export interface ReposConfig {
+  [repository: string]: RepoConfig;
 }

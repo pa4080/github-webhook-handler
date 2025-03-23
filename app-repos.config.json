@@ -1,0 +1,29 @@
+{
+    "repository.name": {
+        "branch": "main",
+        "commands": [
+            "pnpm install",
+            "pnpm build",
+            "pnpm docker:build",
+            "pnpm docker:deploy"
+        ],
+        "package_manager": "pnpm",
+        "ssh_key_path": "/path/to/your/ssh/private/key",
+        "ssh_key_passphrase": "optional_passphrase_if_your_key_has_one",
+        "repo_supported_events": ["push", "pull_request", "ping"],
+        "env_vars": {
+            "NODE_ENV": "production",
+            "PORT": "3000"
+        },
+        "pre_deploy_commands": ["pnpm install", "pnpm build"],
+        "post_deploy_commands": ["pnpm restart"],
+        "notifications": {
+            "slack_webhook": "https://hooks.slack.com/services/...",
+            "email": "devops@example.com"
+        },
+        "health_check_url": "https://example.com/health",
+        "timeout": 300,
+        "max_retries": 3,
+        "retry_delay": 30
+    }
+}
