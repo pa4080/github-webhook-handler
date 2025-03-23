@@ -1,0 +1,30 @@
+# Environment variables
+.env
+
+# Dependencies
+node_modules/
+npm-debug.log
+yarn-error.log
+yarn-debug.log
+pnpm-debug.log
+.pnpm-store/
+
+# TypeScript build output
+dist/
+
+# Repository clones
+repos/
+
+# Logs
+logs/
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor directories and files
+.idea/
+.vscode/
+*.swp
+*.swo
