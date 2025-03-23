@@ -1,42 +1,30 @@
 #!/bin/bash
 
-# Get the directory where the script is located
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-ROOT_DIR="$( cd "$SCRIPT_DIR/.." && pwd )"
-
-# Source the .env file from the root directory
-if [ -f "$ROOT_DIR/.env" ]; then
-  echo "Loading environment from $ROOT_DIR/.env"
-  source "$ROOT_DIR/.env"
-else
-  echo "Warning: .env file not found in $ROOT_DIR"
-fi
+. $PWD/.env
 
 # Configuration with fallbacks
-: ${WEBHOOK_URL:="http://localhost:3000/webhook"}
+: ${WEBHOOK_URL:="http://localhost:3071/webhook"}
 : ${WEBHOOK_SECRET:="your_webhook_secret_key_here"}
 
 echo "Using webhook URL: $WEBHOOK_URL"
-echo "Using webhook secret: ${WEBHOOK_SECRET:0:3}****"
+echo "Using webhook secret: $(echo "$WEBHOOK_SECRET" | cut -c1-3)****"
 
 # Accept event type as a parameter or default to push
 EVENT_TYPE="${1:-push}"
-valid_events=("push" "pull_request")
-
 # Validate event type
-if [[ ! " ${valid_events[*]} " =~ " ${EVENT_TYPE} " ]]; then
-    echo "Error: Invalid event type '${EVENT_TYPE}'. Valid options are: push, pull_request"
+if [ "$EVENT_TYPE" != "push" ] && [ "$EVENT_TYPE" != "pull_request" ]; then
+    echo "Error: Invalid event type '$EVENT_TYPE'. Valid options are: push, pull_request"
     exit 1
 fi
 
 echo "Testing webhook with event type: ${EVENT_TYPE}"
 # Create the appropriate payload based on event type
-if [[ "$EVENT_TYPE" == "pull_request" ]]; then
-    # Pull request payload
-    PAYLOAD='{"event":"pull_request","repository":"pa4080/exc.js-marker-detector","action":"opened","requestID":"74b1912d19cfe780f1fada4b525777fd","pull_request":{"number":123,"html_url":"https://github.com/pa4080/exc.js-marker-detector/pull/123","title":"Feature: Add new functionality","state":"open","merged":false,"head":{"ref":"feature-branch","sha":"a636b6f0861bbee98039bf3df66ee13d8fbc9c74"},"base":{"ref":"main","sha":"b74e39826c8b8bf946f9e1981e3f743e9387c0a1"}}}'
+if [ "$EVENT_TYPE" = "pull_request" ]; then
+    # Pull request payload that matches GitHub's format
+    PAYLOAD='{"action":"opened","repository":{"full_name":"pa4080/exc.js-marker-detector"},"pull_request":{"number":123,"html_url":"https://github.com/pa4080/exc.js-marker-detector/pull/123","title":"Feature: Add new functionality","state":"open","merged":false,"head":{"ref":"feature-branch","sha":"a636b6f0861bbee98039bf3df66ee13d8fbc9c74"},"base":{"ref":"main","sha":"b74e39826c8b8bf946f9e1981e3f743e9387c0a1"}}}'
 else
-    # Push payload
-    PAYLOAD='{"event":"push","repository":"pa4080/exc.js-marker-detector","commit":"a636b6f0861bbee98039bf3df66ee13d8fbc9c74","ref":"refs/heads/master","head":"","workflow":"Build and deploy","requestID":"74b1912d19cfe780f1fada4b525777fd"}'
+    # Push payload that matches GitHub's format
+    PAYLOAD='{"ref":"refs/heads/master","repository":{"full_name":"pa4080/exc.js-marker-detector"},"head_commit":{"id":"a636b6f0861bbee98039bf3df66ee13d8fbc9c74"}}'
 fi
 
 # Generate the signature using OpenSSL
@@ -57,6 +45,8 @@ echo
 curl -X POST "$WEBHOOK_URL" \
   -H "Content-Type: application/json" \
   -H "X-Hub-Signature-256: $SIGNATURE" \
+  -H "X-GitHub-Event: $EVENT_TYPE" \
+  -H "X-GitHub-Delivery: $(uuidgen || date +%s)" \
   -d "$PAYLOAD" \
   -v \
   -w "\n\nStatus code: %{http_code}\n"

@@ -11,15 +11,27 @@ import { executeDeployment } from '../utils/deployment';
  */
 export async function handleWebhook(req: Request, res: Response): Promise<void> {
   const signature = req.headers['x-hub-signature-256'] as string | undefined;
-  const payload = req.body as WebhookPayload;
+  const githubEvent = req.headers['x-github-event'] as string | undefined;
+  const rawPayload = req.rawBody || JSON.stringify(req.body);
   
-  console.log('Received webhook:', JSON.stringify(payload, null, 2));
+  console.log(`Received webhook with event: ${githubEvent}`);
   
-  // Verify signature if webhook secret is configured
-  if (!verifySignature(payload, signature)) {
+  // Verify signature using the raw payload body
+  if (!verifySignature(rawPayload, signature)) {
     console.error('Invalid webhook signature');
     res.status(401).send('Invalid signature');
     return;
+  }
+  
+  // Log the payload after validating the signature
+  console.log('Webhook payload:', JSON.stringify(req.body, null, 2));
+  
+  // Parse the payload
+  const payload = req.body as WebhookPayload;
+  
+  // If githubEvent header is present, use it as the event type
+  if (githubEvent) {
+    payload.event = githubEvent;
   }
   
   // Validate payload and check for supported events
@@ -30,10 +42,17 @@ export async function handleWebhook(req: Request, res: Response): Promise<void> 
   }
   
   // Only process supported events
-  const supportedEvents = ['push', 'pull_request'];
+  const supportedEvents = ['push', 'pull_request', 'ping'];
   if (!supportedEvents.includes(payload.event)) {
     console.log(`Ignoring unsupported event: ${payload.event}`);
     res.status(200).send('Event ignored');
+    return;
+  }
+  
+  // Handle ping event (sent when webhook is created)
+  if (payload.event === 'ping') {
+    console.log('Received ping event from GitHub');
+    res.status(200).send('Pong!');
     return;
   }
   
@@ -46,7 +65,15 @@ export async function handleWebhook(req: Request, res: Response): Promise<void> 
       res.status(400).send('Invalid pull_request payload');
       return;
     }
-    repository = payload.repository;
+    
+    // Extract repository from GitHub's pull_request payload format
+    if (payload.repository?.full_name) {
+      repository = payload.repository.full_name;
+    } else {
+      console.error('Invalid pull_request payload: missing repository.full_name');
+      res.status(400).send('Invalid pull_request payload: missing repository information');
+      return;
+    }
     
     // For pull_request events, check for specific actions we want to process
     const supportedActions = ['opened', 'synchronize', 'closed', 'reopened'];
@@ -58,13 +85,17 @@ export async function handleWebhook(req: Request, res: Response): Promise<void> 
     
     console.log(`Processing pull_request ${payload.action || 'event'} for PR #${payload.pull_request.number} in repository: ${repository}`);
   } else if (payload.event === 'push') {
-    if (!payload.repository) {
-      console.error('Invalid push payload: missing repository');
-      res.status(400).send('Invalid payload format: missing repository');
+    // Extract repository from GitHub's push payload format
+    if (payload.repository?.full_name) {
+      repository = payload.repository.full_name;
+    } else {
+      console.error('Invalid push payload: missing repository.full_name');
+      res.status(400).send('Invalid payload format: missing repository information');
       return;
     }
-    repository = payload.repository;
-    console.log(`Processing push event for repository: ${repository}, ref: ${payload.ref || 'unknown'}`);
+    
+    const commitSha = payload.head_commit?.id || payload.after || 'unknown';
+    console.log(`Processing push event for repository: ${repository}, ref: ${payload.ref || 'unknown'}, commit: ${commitSha}`);
   }
   
   // Generate repository URL from the repository name

@@ -1,4 +1,4 @@
-import express, { Express } from 'express';
+import express, { Express, Request, Response, NextFunction } from 'express';
 import bodyParser from 'body-parser';
 import fs from 'fs';
 import path from 'path';
@@ -8,8 +8,14 @@ import routes from './routes';
 // Create Express application
 const app: Express = express();
 
-// Middleware
-app.use(bodyParser.json());
+// Standard middleware for JSON parsing with raw body capture
+app.use(bodyParser.json({
+  verify: (req: Request & { rawBody?: string }, res: Response, buf: Buffer) => {
+    // Capture raw body for signature verification
+    req.rawBody = buf.toString();
+  }
+}));
+
 
 // Mount routes
 app.use('/', routes);
