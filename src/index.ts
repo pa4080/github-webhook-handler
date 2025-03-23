@@ -21,9 +21,6 @@ app.use('/webhook', (req: express.Request & { rawBody?: string }, res: express.R
   });
 });
 
-// JSON parsing middleware
-app.use(express.json());
-
 // Webhook route
 app.post('/webhook', handleWebhook);
 

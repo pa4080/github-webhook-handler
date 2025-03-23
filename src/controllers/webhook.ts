@@ -13,7 +13,7 @@ export async function handleWebhook(req: Request, res: Response): Promise<void> 
   const signature = req.headers['x-hub-signature-256'] as string | undefined;
   const githubEvent = req.headers['x-github-event'] as string | undefined;
   const deliveryId = req.headers['x-github-delivery'] as string | undefined;
-  const rawPayload = req.rawBody || JSON.stringify(req.body);
+  const rawPayload = req.rawBody || '';
   
   console.log(`Received webhook with event: ${githubEvent}${deliveryId ? `, delivery ID: ${deliveryId}` : ''}`);
   
@@ -25,10 +25,10 @@ export async function handleWebhook(req: Request, res: Response): Promise<void> 
   }
 
   // Log the payload after validating the signature
-  console.log('Webhook payload:', JSON.stringify(req.body, null, 2));
+  console.log('Webhook payload:', JSON.stringify(JSON.parse(rawPayload), null, 2));
   
   // Parse the payload
-  const payload = req.body as WebhookPayload;
+  const payload = JSON.parse(rawPayload) as WebhookPayload;
   
   // If githubEvent header is present, use it as the event type
   if (githubEvent) {
@@ -157,34 +157,35 @@ export async function handleWebhook(req: Request, res: Response): Promise<void> 
   const sshUrl = `git@github.com:${owner}/${repo}`;
   
   // Get repository-specific configuration
-  let repoConfig: RepoConfig | null = getRepoConfig(repoName);
-  
-  if (!repoConfig) {
+  let repoConfig = getRepoConfig(repository);
+  if (repoConfig) {
+    console.log(`Using custom config for ${repository}`);
+    
+    // Apply config settings
+    if (repoConfig.env_vars) {
+      process.env = { ...process.env, ...repoConfig.env_vars };
+    }
+    
+    // Use configured branch if exists
+    branch = repoConfig.branch || branch;
+    
+    // Check if this event is supported by the repository config
+    if (repoConfig.repo_supported_events && 
+        !repoConfig.repo_supported_events.includes(payload.event)) {
+      console.log(`Event ${payload.event} is not supported by repository config`);
+      res.status(200).send(`Event ${payload.event} is not supported for this repository`);
+      return;
+    }
+  } else {
     console.log(`No custom config found for ${repository}, using defaults`);
-    repoConfig = {
+    // Set default config to avoid null checks later
+    const defaultConfig: RepoConfig = {
       branch: branch,
-      command: '',
+      commands: [],
       env_vars: {},
       repo_supported_events: APP_SUPPORTED_EVENTS,
     };
-  } else {
-    console.log(`Using custom config for ${repository}`);
-  }
-  
-  // Apply config settings
-  if (repoConfig.env_vars) {
-    process.env = { ...process.env, ...repoConfig.env_vars };
-  }
-  
-  // Use configured branch if exists
-  branch = repoConfig.branch || branch;
-  
-  // Check if this event is supported by the repository config
-  if (repoConfig.repo_supported_events && 
-      !repoConfig.repo_supported_events.includes(payload.event)) {
-    console.log(`Event ${payload.event} is not supported by repository config`);
-    res.status(200).send(`Event ${payload.event} is not supported for this repository`);
-    return;
+    repoConfig = defaultConfig;
   }
 
   // For non-default branches or skipped deployments, still update code but don't deploy

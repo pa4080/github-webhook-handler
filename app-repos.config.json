@@ -1,5 +1,5 @@
 {
-    "repository.name": {
+    "owner/exact-repository.name": {
         "branch": "main",
         "commands": [
             "pnpm install",
