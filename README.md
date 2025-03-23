@@ -23,28 +23,6 @@ A TypeScript webhook server that listens for GitHub webhook events, pulls reposi
 - SSH key (for private repositories)
 - PM2 (optional, for production deployment)
 
-## Project Structure
-
-```
-/
-├── dist/               # Compiled TypeScript output
-├── scripts/            # Shell scripts for operations
-│   ├── start.sh        # Script to start the application
-│   └── test-webhook.sh # Script to test the webhook
-├── src/                # TypeScript source code
-│   ├── controllers/    # Request handlers
-│   ├── routes/         # API routes
-│   ├── utils/          # Helper utilities
-│   ├── config.ts       # Configuration management
-│   ├── index.ts        # Main application entry point
-│   └── types.ts        # TypeScript interfaces
-├── .env                # Environment configuration (create from sample.env)
-├── ecosystem.config.js # PM2 configuration
-├── package.json        # Project dependencies and scripts
-├── tsconfig.json       # TypeScript configuration
-└── README.md          # Project documentation
-```
-
 ## Installation
 
 1. Clone this repository:
@@ -180,7 +158,11 @@ You can trigger this webhook from GitHub Actions using the [Workflow Webhook Act
 
 ## Repository Configuration
 
-All repository configurations are stored in a single file located at `repos/config.json`. Example configuration:
+All repository configurations are stored in a single file located at `repos/config.json`, Example configuration:
+
+```bash
+cat repos/config.json
+```
 
 ```json
 {
@@ -188,52 +170,21 @@ All repository configurations are stored in a single file located at `repos/conf
         "branch": "main",
         "commands": [
             "pnpm install",
-            "pnpm build",
-            "pnpm docker:build",
             "pnpm docker:deploy"
         ],
-        "package_manager": "pnpm",
-        "ssh_key_path": "/path/to/your/ssh/private/key",
-        "ssh_key_passphrase": "optional_passphrase_if_your_key_has_one",
-        "repo_supported_events": ["push", "pull_request", "ping"],
-        "env_vars": {
-            "NODE_ENV": "production",
-            "PORT": "3000"
-        },
-        "pre_deploy_commands": ["pnpm install", "pnpm build"],
-        "post_deploy_commands": ["pnpm restart"],
-        "notifications": {
-            "slack_webhook": "https://hooks.slack.com/services/...",
-            "email": "devops@example.com"
-        },
-        "health_check_url": "https://example.com/health",
-        "timeout": 300,
-        "max_retries": 3,
-        "retry_delay": 30
     },
     "repository.name.2": {
         "branch": "main",
-        "commands": [
-            "npm install",
-            "npm run build",
-            "npm run deploy"
-        ],
-        "package_manager": "npm",
         "repo_supported_events": ["push"],
         "env_vars": {
-            "NODE_ENV": "production"
+            "NODE_ENV": "production",
+            "ACCESS_TOKEN": "your-access-token"
         },
-        "pre_deploy_commands": ["npm install"],
-        "post_deploy_commands": ["npm run start"],
-        "health_check_url": "https://example2.com/health",
-        "timeout": 600,
-        "max_retries": 5,
-        "retry_delay": 60
     }
 }
 ```
 
-Configuration Options:
+For more details see [app-repos.config.json](app-repos.config.json) for an example configuration template. Configuration Options:
 
 - `branch`: The branch to deploy from (default: main)
 - `command`: Single deployment command to run (deprecated, use `commands` array instead)
@@ -261,7 +212,6 @@ The application uses the following environment variables:
 - `SSH_PRIVATE_KEY_PATH`: Path to SSH private key for private repos
 - `SSH_KEY_PASSPHRASE`: Passphrase for SSH key (if needed)
 
-Note: All repository-specific configurations should be placed in the `repos/config.json` file. See [app-repos.config.json](cci:7://file:///home/pa4080/git/webhook/app-repos.config.json:0:0-0:0) for an example configuration template.
 
 ## Security Considerations
 
