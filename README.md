@@ -26,23 +26,27 @@ A TypeScript webhook server that listens for GitHub webhook events, pulls reposi
 ## Installation
 
 1. Clone this repository:
+
    ```bash
    git clone <repository-url>
    cd webhook
    ```
 
 2. Install dependencies:
+
    ```bash
    pnpm install
    ```
 
 3. Create your environment configuration:
+
    ```bash
    cp sample.env .env
    ```
 
 4. Edit the `.env` file with your specific configuration:
    - Set your webhook secret key (you can generate a secure random secret with one of these commands):
+
      ```bash
      # Option 1: Using OpenSSL (recommended)
      openssl rand -hex 32
@@ -52,7 +56,9 @@ A TypeScript webhook server that listens for GitHub webhook events, pulls reposi
 
      # Option 3: Using Python
      python -c "import secrets; print(secrets.token_hex(32))"
+
      ```
+
    - Configure SSH key path for private repositories if needed (`SSH_PRIVATE_KEY_PATH`)
    - Configure `USE_SSH=true` if you want to clone repositories using SSH instead of HTTPS
    - Set up deployment commands for repositories (optional)
@@ -72,6 +78,7 @@ pnpm start
 ```
 
 The start script automatically:
+
 - Installs dependencies if needed
 - Builds TypeScript code if changes are detected
 - Uses PM2 if available, otherwise falls back to Node.js
@@ -79,16 +86,19 @@ The start script automatically:
 ### Alternative start methods
 
 **Direct Node.js execution:**
+
 ```bash
 pnpm run start:direct
 ```
 
 **Using PM2 directly:**
+
 ```bash
 pm2 start ecosystem.config.js
 ```
 
 **PM2 commands:**
+
 ```bash
 # Check status
 pm2 status
@@ -106,6 +116,7 @@ pm2 stop webhook
 ### Development mode
 
 For development with auto-reload:
+
 ```bash
 pnpm run dev
 ```
@@ -139,6 +150,10 @@ This allows you to verify your webhook server is properly handling both push and
 5. Select the events you want to trigger the webhook (both "Push" and "Pull requests" events are supported)
 6. Enable SSL verification if your server supports HTTPS
 7. Click "Add webhook"
+
+### Health Check Endpoint
+
+To verify the health of the webhook server, you can use the `https://your-server.com/health` endpoint. This endpoint responds with the status of the server and its current version.
 
 ### Configure GitHub Actions
 
@@ -207,7 +222,6 @@ The application uses the following environment variables:
 - `USE_SSH`: Set to 'true' to use SSH for cloning (default: false)
 - `SSH_PRIVATE_KEY_PATH`: Path to SSH private key for private repos
 - `SSH_KEY_PASSPHRASE`: Passphrase for SSH key (if needed)
-
 
 ## Security Considerations
 
