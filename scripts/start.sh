@@ -27,6 +27,7 @@ if command -v pm2 >/dev/null 2>&1; then
   fi
 
   echo "Starting new PM2 process..."
+  export NODE_ENV=production
   pm2 start dist/index.js --name webhook
 
   # Display PM2 status

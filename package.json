@@ -1,6 +1,6 @@
 {
   "name": "github-webhook-deployer",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "A webhook server that listens for GitHub events and executes deployment commands",
   "main": "dist/index.js",
   "scripts": {
