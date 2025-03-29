@@ -18,15 +18,17 @@ fi
 # Check if PM2 is available
 if command -v pm2 >/dev/null 2>&1; then
   echo "Starting webhook server with PM2..."
+
   # Check if the app is already running with PM2
   if pm2 list | grep -q "webhook"; then
-    echo "Restarting existing PM2 process..."
-    pm2 restart webhook
-  else
-    echo "Starting new PM2 process..."
-    pm2 start dist/index.js --name webhook
+    echo "Removing existing PM2 process..."
+    pm2 stop webhook
+    pm2 delete webhook
   fi
-  
+
+  echo "Starting new PM2 process..."
+  pm2 start dist/index.js --name webhook
+
   # Display PM2 status
   pm2 status
 else

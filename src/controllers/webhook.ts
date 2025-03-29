@@ -135,13 +135,15 @@ export async function handleWebhook(req: Request, res: Response): Promise<void> 
     console.log(`Successfully pulled latest changes for ${repository}`);
 
     if (repoConfig.commands && repoConfig.commands.length > 0) {
-      console.log(`Starting deployment for "${repository}" ...`);
+      console.log(`Starting deployment commands for "${repository}" in directory: ${repoDir}`);
 
       for (const command of repoConfig.commands) {
         await executeDeployment(command, repoDir);
       }
+
+      console.log('Deployment completed successfully!');
     } else {
-      console.log(`No deployment commands to execute for ${repository}`);
+      console.log(`No deployment commands to execute for "${repository}"`);
     }
 
     // Send health check if configured
@@ -163,5 +165,5 @@ export async function handleWebhook(req: Request, res: Response): Promise<void> 
   }
 
   const duration = ((Date.now() - startTime) / 1000).toFixed(2);
-  console.log(`Processing for "${repository}" completed in ${duration}s`);
+  console.log(`Processing "${repository}" completed in ${duration}s`);
 }

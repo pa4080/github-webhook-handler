@@ -7,7 +7,7 @@ import { spawn } from 'child_process';
  * @returns Promise that resolves when the process exits
  */
 export async function executeDeployment(command: string, cwd: string): Promise<void> {
-  console.log(`Executing deployment command in "${cwd}": "${command}"..`);
+  console.log(`Executing command: "${command}"`);
 
   return new Promise((resolve, reject) => {
     // Split command into parts (for cross-platform support)
@@ -34,7 +34,7 @@ export async function executeDeployment(command: string, cwd: string): Promise<v
     // Handle process exit
     child.on('close', (code) => {
       if (code === 0) {
-        console.log('Deployment completed successfully!');
+        console.log(`Command "${command}" completed successfully!`);
         resolve();
       } else {
         reject(new Error(`Deployment command failed with exit code ${code}`));
