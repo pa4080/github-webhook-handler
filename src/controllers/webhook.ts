@@ -144,9 +144,6 @@ export async function handleWebhook(req: Request, res: Response): Promise<void> 
       console.log(`No deployment commands to execute for ${repository}`);
     }
 
-    const duration = ((Date.now() - startTime) / 1000).toFixed(2);
-    console.log(`Processing for "${repository}" completed in ${duration}s`);
-
     // Send health check if configured
     if (repoConfig.health_check_url) {
       try {
@@ -164,4 +161,7 @@ export async function handleWebhook(req: Request, res: Response): Promise<void> 
   } catch (error) {
     console.error('Deployment failed:', error instanceof Error ? error.message : String(error));
   }
+
+  const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+  console.log(`Processing for "${repository}" completed in ${duration}s`);
 }
