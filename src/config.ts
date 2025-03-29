@@ -6,20 +6,27 @@ import { RepoConfig, ReposConfig } from './types';
 export const SSH_PRIVATE_KEY_PATH = process.env.SSH_PRIVATE_KEY_PATH || '';
 export const SSH_KEY_PASSPHRASE = process.env.SSH_KEY_PASSPHRASE || undefined;
 
-// App supported events
-export const APP_SUPPORTED_EVENTS = ['push', 'pull_request', 'ping'];
 
-export function getRepoConfig(repoName: string): RepoConfig | null {
+// Set default config to avoid null checks later
+export const DEFAULT_BRANCH = 'master';
+export const DEFAULT_CONFIG: RepoConfig = {
+  branch: DEFAULT_BRANCH,
+  commands: [],
+  env_vars: {},
+};
+
+export function getRepoConfig(repoName: string): RepoConfig {
   const configPath = path.join(process.cwd(), 'repos', 'config.json');
-  
+
   try {
     if (fs.existsSync(configPath)) {
       const config = JSON.parse(fs.readFileSync(configPath, 'utf-8')) as ReposConfig;
-      return config[repoName] || null;
+      return !!config[repoName] ? { ...DEFAULT_CONFIG, ...config[repoName] } : DEFAULT_CONFIG;
     }
-    return null;
+    return DEFAULT_CONFIG;
   } catch (error) {
     console.error(`Error reading config for ${repoName}:`, error);
-    return null;
+    return DEFAULT_CONFIG;
   }
 }
+

@@ -46,10 +46,10 @@ A TypeScript webhook server that listens for GitHub webhook events, pulls reposi
      ```bash
      # Option 1: Using OpenSSL (recommended)
      openssl rand -hex 32
-     
+
      # Option 2: Using Node.js
      node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-     
+
      # Option 3: Using Python
      python -c "import secrets; print(secrets.token_hex(32))"
      ```
@@ -117,14 +117,11 @@ The project includes a test script to verify your webhook functionality. First, 
 ```bash
 # Test with push event (default)
 pnpm test:webhook
-
-# Or specify the event type
-pnpm test:webhook push
-pnpm test:webhook pull_request
 ```
 
 The script:
-1. Accepts an event type parameter (`push` or `pull_request`)
+
+1. Accepts an event type parameter `push`
 2. Creates an appropriate payload based on the event type
 3. Generates a HMAC-SHA256 signature using OpenSSL and your webhook secret
 4. Sends the payload with the signature to your webhook server
@@ -192,7 +189,6 @@ For more details see [app-repos.config.json](app-repos.config.json) for an examp
 - `package_manager`: Package manager to use (npm, pnpm, yarn)
 - `ssh_key_path`: Path to SSH private key for private repos
 - `ssh_key_passphrase`: Passphrase for SSH key (if needed)
-- `repo_supported_events`: Events to process (default: push, pull_request, ping)
 - `env_vars`: Environment variables to set
 - `pre_deploy_commands`: Commands to run before deployment
 - `post_deploy_commands`: Commands to run after deployment

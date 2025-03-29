@@ -4,7 +4,7 @@
 export interface WebhookPayload {
   // Common fields that we use
   event?: string;          // Set from X-GitHub-Event header
-  
+
   // Repository information (GitHub format)
   repository?: {
     full_name: string;     // Repository name in 'owner/repo' format
@@ -15,15 +15,15 @@ export interface WebhookPayload {
     html_url?: string;     // Repository URL
     [key: string]: any;    // Other repository properties
   };
-  
+
   // Git reference information
   ref?: string;            // Git ref e.g., refs/heads/main
   before?: string;         // SHA of the previous commit (push event)
   after?: string;          // SHA of the current commit (push event)
-  
+
   // Action for events like pull_request, issues, etc.
   action?: string;         // 'opened', 'closed', 'synchronize', etc.
-  
+
   // Push event specific fields
   head_commit?: {
     id: string;            // Commit SHA
@@ -36,8 +36,8 @@ export interface WebhookPayload {
     modified: string[];
     [key: string]: any;    // Other commit properties
   };
-  
-  // Pull request specific fields
+
+  // Pull request specific fields -- removed in the current version
   pull_request?: {
     number: number;        // Pull request number
     html_url: string;      // URL to the pull request
@@ -60,26 +60,17 @@ export interface WebhookPayload {
     };
     [key: string]: any;    // Other pull request properties
   };
-  
+
   [key: string]: any;      // Allow for additional properties
 }
 
 // Repository configuration interface
 export interface RepoConfig {
   branch: string;
-  command?: string;
   commands?: string[];
-  package_manager?: string;
   ssh_key_path?: string;
   ssh_key_passphrase?: string;
-  repo_supported_events?: string[];
   env_vars?: Record<string, string>;
-  pre_deploy_commands?: string[];
-  post_deploy_commands?: string[];
-  notifications?: {
-    slack_webhook?: string;
-    email?: string;
-  };
   health_check_url?: string;
   timeout?: number;
   max_retries?: number;
