@@ -80,7 +80,7 @@ pnpm start
 The start script automatically:
 
 - Installs dependencies if needed
-- Builds TypeScript code if changes are detected
+- **Builds TypeScript code if changes are detected**
 - Uses PM2 if available, otherwise falls back to Node.js
 
 ### Alternative start methods
@@ -94,7 +94,7 @@ pnpm run start:direct
 **Using PM2 directly:**
 
 ```bash
-pm2 start ecosystem.config.js
+pm2 start ecosystem.config.js --env production
 ```
 
 **PM2 commands:**
