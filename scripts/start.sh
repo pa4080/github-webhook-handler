@@ -82,8 +82,9 @@ if command -v pm2 >/dev/null 2>&1; then
   echo "PM2 status:"
   pm2 status
 
-  # Display PM2 status
-  pm2 status
+  # Save the PM2 configuration
+  echo "PM2 configuration save."
+  pm2 save
 else
   # PM2 not found, fall back to Node.js
   echo "PM2 not found. Starting webhook server with Node.js..."
