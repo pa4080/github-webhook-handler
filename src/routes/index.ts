@@ -1,3 +1,4 @@
+/** Currently not used in the project */
 import { Router } from 'express';
 import { handleWebhook } from '../controllers/webhook';
 
