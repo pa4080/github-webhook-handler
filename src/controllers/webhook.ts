@@ -100,16 +100,19 @@ export async function handleWebhook(req: Request, res: Response): Promise<void> 
     return;
   }
 
+  // Get repository-specific configuration
+  let repoConfig = getRepoConfig(repository);
+  console.log(`Config in use for ${repository}:`, repoConfig);
+
+  process.env = { ...process.env, ...repoConfig?.env_vars };
+
   // Construct repository URL and name
   const repoName = repo.replace(/\.git$/, '');
   const httpsUrl = `https://github.com/${owner}/${repo}`;
   const sshUrl = `git@github.com:${owner}/${repo}`;
   const cloneUrl = process.env.USE_SSH === 'true' ? sshUrl : httpsUrl;
 
-  // Get repository-specific configuration
-  let repoConfig = getRepoConfig(repository);
-  console.log(`Config in use for ${repository}:`, repoConfig);
-
+  // Check if deployment should be skipped
   const shouldDeploy = !skipDeployment || branch === repoConfig.branch;
 
   // For non-default branches or skipped deployments, still update code but don't deploy
@@ -118,8 +121,6 @@ export async function handleWebhook(req: Request, res: Response): Promise<void> 
     res.status(200).send(`Webhook received, deployment skipped for branch: ${branch}`);
     return;
   }
-
-  process.env = { ...process.env, ...repoConfig?.env_vars };
 
   // Send immediate response for deployments
   res.status(200).send('Webhook received, deployment started');
