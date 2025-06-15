@@ -55,6 +55,8 @@ export async function handleWebhook(req: Request, res: Response): Promise<void> 
   let skipDeployment = true;
 
   if (payload.event === 'push') {
+    skipDeployment = false;
+
     // Extract repository from GitHub's push payload format
     if (payload.repository?.full_name) {
       repository = payload.repository.full_name;
@@ -88,8 +90,6 @@ export async function handleWebhook(req: Request, res: Response): Promise<void> 
       console.log(`Modified files (${payload.head_commit.modified.length}):`);
       payload.head_commit.modified.forEach((file: string) => console.log(` - ${file}`));
     }
-
-    skipDeployment = false;
   }
 
   // Extract owner and repo name
@@ -113,7 +113,7 @@ export async function handleWebhook(req: Request, res: Response): Promise<void> 
   const cloneUrl = process.env.USE_SSH === 'true' ? sshUrl : httpsUrl;
 
   // Check if deployment should be skipped
-  const shouldDeploy = !skipDeployment || branch === repoConfig.branch;
+  const shouldDeploy = !skipDeployment && branch === repoConfig.branch;
 
   // For non-default branches or skipped deployments, still update code but don't deploy
   if (!shouldDeploy) {
