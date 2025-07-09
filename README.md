@@ -1,6 +1,6 @@
 # GitHub Webhook Handler
 
-> **Disclaimer**: This project was created using Vibe Coding's [Windsurf AI IDE](https://codeium.com/windsurf). The code and structure were generated with the help of AI, but it has been reviewed and modified by human developers to ensure quality and functionality.
+> **Disclaimer**: This project was created using Vibe Coding's [Windsurf AI IDE](https://codeium.com/windsurf). The code and structure were generated with the help of AI, but it has been reviewed and modified by me to ensure quality and functionality. Actually the generated code was pretty ugly, so I cleaned it up a bit.
 
 A TypeScript webhook server that listens for GitHub webhook events, pulls repositories, and executes deployment commands.
 

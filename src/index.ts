@@ -2,6 +2,7 @@ import express from 'express';
 import dotenv from 'dotenv';
 import { handleWebhook } from './controllers/webhook';
 import packageJson from '../package.json';
+import path from 'path';
 
 // Load environment variables
 dotenv.config();
@@ -29,6 +30,10 @@ app.get('/health', (req, res) => {
   res.status(200).send(`Webhook server is running. v.${packageJson.version}`);
 });
 
+// Serve favicon
+app.get('/favicon.ico', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'WebHookLogo.svg'));
+});
 
 // Start server
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
