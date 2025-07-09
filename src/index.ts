@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import { handleWebhook } from './controllers/webhook';
 import packageJson from '../package.json';
 import path from 'path';
+import { handleMonitoring } from './controllers/monitoring';
 
 // Load environment variables
 dotenv.config();
@@ -29,6 +30,11 @@ app.get('/health', (req, res) => {
   // res.status(200).send(`Webhook server is running. v.${process.env.npm_package_version}`);
   res.status(200).send(`Webhook server is running. v.${packageJson.version}`);
 });
+
+// Monitoring
+app.get('/monitoring', handleMonitoring);
+
+
 
 // Serve favicon
 app.get('/favicon.ico', (req, res) => {
