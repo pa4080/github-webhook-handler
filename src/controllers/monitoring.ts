@@ -4,10 +4,14 @@ import { Request, Response } from 'express';
 export function handleMonitoring(req: Request, res: Response) {
 	const secret = req.query.secret as string;
 	if (secret === process.env.MONITORING_SECRET) {
-		res.setHeader('Content-Type', 'text/plain');
+		res.setHeader('Content-Type', 'text/plain; charset=utf-8');
 		res.setHeader('Transfer-Encoding', 'chunked');
 
 		const logProcess = spawn('/usr/local/bin/pm2', ['logs', 'webhook']);
+
+		// Ensure the child stream is decoded as UTF‑8 before piping
+		logProcess.stdout.setEncoding('utf8');
+		logProcess.stderr.setEncoding('utf8');
 
 		logProcess.stdout.pipe(res);
 		logProcess.stderr.pipe(res);

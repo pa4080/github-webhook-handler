@@ -81,6 +81,7 @@ The start script automatically:
 
 - Installs dependencies if needed
 - **Builds TypeScript code if changes are detected**
+- Copy `src/public` to `dist/public`
 - Uses PM2 if available, otherwise falls back to Node.js
 
 ### Alternative start methods

@@ -35,6 +35,14 @@ if [ ! -d "dist" ] || [ -n "$(find src -name "*.ts" -newer dist 2>/dev/null)" ];
   }
 fi
 
+# Remove dist/public if exists and copy the contents of src/public to dist/public
+if [ -d "dist/public" ]; then
+  echo "Removing dist/public..."
+  rm -rf dist/public
+fi
+echo "Copying src/public to dist/public..."
+cp -R src/public dist/public
+
 # Check if PM2 is available
 if command -v pm2 >/dev/null 2>&1; then
   echo "Starting webhook server with PM2..."
