@@ -45,7 +45,7 @@ A TypeScript webhook server that listens for GitHub webhook events, pulls reposi
    ```
 
 4. Edit the `.env` file with your specific configuration:
-   - Set your webhook secret key (you can generate a secure random secret with one of these commands):
+   - Set your `WEBHOOK_SECRET` key (you can generate a secure random secret with one of these commands):
 
      ```bash
      # Option 1: Using OpenSSL (recommended)
@@ -58,6 +58,8 @@ A TypeScript webhook server that listens for GitHub webhook events, pulls reposi
      python -c "import secrets; print(secrets.token_hex(32))"
 
      ```
+
+   - Use the same approach  and set `MONITORING_SECRET` key. Or leave it empty to disable this functionality. For more details see the section **Monitoring PM2 Endpoint**.
 
    - Configure SSH key path for private repositories if needed (`SSH_PRIVATE_KEY_PATH`)
    - Configure `USE_SSH=true` if you want to clone repositories using SSH instead of HTTPS
@@ -155,6 +157,10 @@ This allows you to verify your webhook server is properly handling both push and
 ### Health Check Endpoint
 
 To verify the health of the webhook server, you can use the `https://your-server.com/health` endpoint. This endpoint responds with the status of the server and its current version.
+
+### Monitoring PM2 Endpoint
+
+If you have provided `MONITORING_SECRET` in the `.env` file, ou can use the `https://your-server.com/monitoring?secret=<your_monitoring_secret_key_here>` endpoint. This endpoint will print in the browser window the output of `pm2 logs webhook` command. So you will be able to monitor the deploument of your applications without login into the server.
 
 ### Configure GitHub Actions
 

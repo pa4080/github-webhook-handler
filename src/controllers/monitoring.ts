@@ -3,7 +3,7 @@ import { Request, Response } from 'express';
 
 export function handleMonitoring(req: Request, res: Response) {
 	const secret = req.query.secret as string;
-	if (secret === process.env.MONITORING_SECRET) {
+	if (secret === process.env.MONITORING_SECRET && !!process.env.MONITORING_SECRET) {
 		res.setHeader('Content-Type', 'text/plain; charset=utf-8');
 		res.setHeader('Transfer-Encoding', 'chunked');
 
