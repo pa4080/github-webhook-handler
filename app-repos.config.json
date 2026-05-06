@@ -21,6 +21,18 @@
     "health_check_url": "https://example.com/health",
     "timeout": 300,
     "max_retries": 3,
-    "retry_delay": 30
+    "retry_delay": 30,
+    "github_deployment": {
+      "enabled": true,
+      "environment": "production",
+      "environment_url": "https://your-deployed-app-domain.com",
+      "log_url": "https://your-server.com/monitoring?secret=<MONITORING_SECRET>",
+      "description": "Deploying to self-hosted VPS",
+      "auto_merge": false,
+      "required_contexts": [],
+      "transient_environment": false,
+      "production_environment": true,
+      "fail_deployment_on_status_error": false
+    }
   }
 }

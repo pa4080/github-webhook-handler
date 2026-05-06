@@ -14,6 +14,7 @@ A TypeScript webhook server that listens for GitHub webhook events, pulls reposi
 - Executes custom deployment commands after repository updates
 - Configurable via environment variables
 - Supports running with PM2 process manager for production environments
+- **GitHub Deployment reporting** — creates GitHub Deployment records and updates their status so self-hosted VPS deployments appear on the GitHub Deployments page
 
 ## Prerequisites
 
@@ -229,6 +230,85 @@ The application uses the following environment variables:
 - `USE_SSH`: Set to 'true' to use SSH for cloning (default: false)
 - `SSH_PRIVATE_KEY_PATH`: Path to SSH private key for private repos
 - `SSH_KEY_PASSPHRASE`: Passphrase for SSH key (if needed)
+- `GITHUB_TOKEN`: GitHub token required when `github_deployment.enabled` is `true` for any repository (see [GitHub Deployment Reporting](#github-deployment-reporting))
+
+## GitHub Deployment Reporting
+
+The webhook handler can optionally create GitHub Deployment records and update their status during self-hosted deployments. This allows deployments from a VPS to appear in the GitHub repository deployments page:
+
+```
+https://github.com/<owner>/<repo>/deployments
+```
+
+### How it works
+
+When a `push` event is received and `github_deployment.enabled` is `true`:
+
+1. A GitHub Deployment is created for the exact commit SHA (`payload.after`).
+2. A deployment status of `in_progress` is immediately posted.
+3. The configured deployment commands are executed.
+4. On success a `success` status is posted; on failure a `failure` status is posted.
+
+If GitHub API calls fail and `fail_deployment_on_status_error` is `false` (the default), the error is only logged — the actual deployment continues.
+
+### Required GitHub token
+
+Set the `GITHUB_TOKEN` environment variable to a token with **Deployments: Read and write** access for the target repository:
+
+| Token type | Required permission |
+|---|---|
+| Fine-grained PAT | Target repository access + **Deployments: Read and write** |
+| GitHub App | Repository permission **Deployments: Read and write** |
+
+If `github_deployment.enabled` is `false` for every repository, no token is required.
+
+### Configuration reference
+
+Add a `github_deployment` block to a repository entry in `repos/config.json`:
+
+```json
+{
+  "pa4080/snapix": {
+    "branch": "master",
+    "commands": ["./deploy.sh"],
+    "github_deployment": {
+      "enabled": true,
+      "environment": "production",
+      "environment_url": "https://your-snapix-domain.com",
+      "log_url": "https://your-server.com/monitoring?secret=<MONITORING_SECRET>",
+      "description": "Deploying Snapix to self-hosted VPS",
+      "auto_merge": false,
+      "required_contexts": [],
+      "transient_environment": false,
+      "production_environment": true,
+      "fail_deployment_on_status_error": false
+    }
+  }
+}
+```
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `enabled` | `boolean` | `false` | Enable GitHub Deployment reporting for this repository |
+| `environment` | `string` | `"production"` | Deployment environment name shown on GitHub |
+| `environment_url` | `string` | — | Public URL of the deployed application |
+| `log_url` | `string` | — | URL to deployment logs |
+| `description` | `string` | `"Deploying to self-hosted VPS"` | Human-readable deployment description |
+| `auto_merge` | `boolean` | `false` | Whether GitHub should auto-merge the default branch into the ref |
+| `required_contexts` | `string[]` | `[]` | Status check contexts required before creating the deployment |
+| `transient_environment` | `boolean` | `false` | Whether the environment is ephemeral |
+| `production_environment` | `boolean` | `true` when `environment === "production"` | Whether this is a production environment |
+| `fail_deployment_on_status_error` | `boolean` | `false` | When `true`, GitHub API errors fail the overall deployment |
+
+### Deployment status lifecycle
+
+```
+push received → GitHub Deployment created → in_progress
+                                                  ↓
+                                         run deploy commands
+                                          ↙           ↘
+                                       success       failure
+```
 
 ## Security Considerations
 
@@ -245,6 +325,12 @@ The application uses the following environment variables:
 - Verify signature calculation if you receive 401 Unauthorized errors
 - Ensure any deployment commands are correctly configured in the `.env` file
 - Validate SSH access by manually trying to clone the repository using the same SSH key
+
+### GitHub Deployment Reporting
+
+- **Deployments do not appear on GitHub**: Check that `github_deployment.enabled` is `true`, `GITHUB_TOKEN` is set, the token has **Deployments: Read and write** permission for the target repository, and that the `owner/repo` key in `repos/config.json` matches the repository's `full_name` exactly.
+- **Deployment status stuck at "in progress"**: The handler process likely crashed before it could post the final status. Check the server logs for errors.
+- **Deployment fails even though the deploy command succeeded**: Check whether `fail_deployment_on_status_error` is `true`. If so, a GitHub API error will cause the overall deployment to be reported as failed.
 
 ## License
 

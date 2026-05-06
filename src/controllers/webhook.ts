@@ -4,6 +4,11 @@ import { verifySignature } from '../utils/webhook';
 import { getRepoConfig, DEFAULT_BRANCH } from '../config';
 import { cloneOrPullRepository } from '../utils/git';
 import { executeDeployment } from '../utils/deployment';
+import {
+  resolveDeploymentConfig,
+  createGitHubDeployment,
+  createGitHubDeploymentStatus,
+} from '../utils/github-deployment';
 import { WebhookPayload, RepoConfig } from '../types';
 
 /**
@@ -52,6 +57,7 @@ export async function handleWebhook(req: Request, res: Response): Promise<void> 
   // Extract repository information based on event type
   let repository = '';
   let branch = '';
+  let commitSha = 'unknown';
   let skipDeployment = true;
 
   if (payload.event === 'push') {
@@ -69,8 +75,8 @@ export async function handleWebhook(req: Request, res: Response): Promise<void> 
     // Extract branch name from ref (refs/heads/master -> master)
     branch = payload.ref ? payload.ref.replace('refs/heads/', '') : DEFAULT_BRANCH;
 
-    // Extract useful commit information
-    const commitSha = payload.head_commit?.id || payload.after || 'unknown';
+    // Extract useful commit information — prefer payload.after for exact deployed SHA
+    commitSha = payload.after || payload.head_commit?.id || 'unknown';
     const commitMessage = payload.head_commit?.message || 'No commit message';
     const commitAuthor = payload.head_commit?.author?.username || payload.head_commit?.author?.name || 'unknown';
 
@@ -127,6 +133,20 @@ export async function handleWebhook(req: Request, res: Response): Promise<void> 
 
   const startTime = Date.now();
 
+  // Resolve GitHub Deployment config (if enabled)
+  const ghDepCfg = repoConfig.github_deployment?.enabled
+    ? resolveDeploymentConfig(repoConfig.github_deployment)
+    : null;
+
+  // Create GitHub deployment and mark as in_progress (best-effort)
+  let ghDeploymentId: number | null = null;
+  if (ghDepCfg) {
+    ghDeploymentId = await createGitHubDeployment(owner, repoName, commitSha, ghDepCfg);
+    if (ghDeploymentId !== null) {
+      await createGitHubDeploymentStatus(owner, repoName, ghDeploymentId, 'in_progress', ghDepCfg);
+    }
+  }
+
   try {
     console.log(`Cloning/pulling from: ${cloneUrl}`);
 
@@ -147,6 +167,11 @@ export async function handleWebhook(req: Request, res: Response): Promise<void> 
       console.log(`No deployment commands to execute for "${repository}"`);
     }
 
+    // Report success to GitHub
+    if (ghDepCfg && ghDeploymentId !== null) {
+      await createGitHubDeploymentStatus(owner, repoName, ghDeploymentId, 'success', ghDepCfg);
+    }
+
     // Send health check if configured
     if (repoConfig.health_check_url) {
       try {
@@ -163,6 +188,11 @@ export async function handleWebhook(req: Request, res: Response): Promise<void> 
     }
   } catch (error) {
     console.error('Deployment failed:', error instanceof Error ? error.message : String(error));
+
+    // Report failure to GitHub (best-effort)
+    if (ghDepCfg && ghDeploymentId !== null) {
+      await createGitHubDeploymentStatus(owner, repoName, ghDeploymentId, 'failure', ghDepCfg);
+    }
   }
 
   const duration = ((Date.now() - startTime) / 1000).toFixed(2);

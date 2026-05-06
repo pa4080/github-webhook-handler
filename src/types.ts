@@ -64,6 +64,20 @@ export interface WebhookPayload {
   [key: string]: any;      // Allow for additional properties
 }
 
+// GitHub Deployment reporting configuration
+export interface GitHubDeploymentConfig {
+  enabled: boolean;
+  environment?: string;
+  environment_url?: string;
+  log_url?: string;
+  description?: string;
+  auto_merge?: boolean;
+  required_contexts?: string[];
+  transient_environment?: boolean;
+  production_environment?: boolean;
+  fail_deployment_on_status_error?: boolean;
+}
+
 // Repository configuration interface
 export interface RepoConfig {
   branch: string;
@@ -75,6 +89,7 @@ export interface RepoConfig {
   timeout?: number;
   max_retries?: number;
   retry_delay?: number;
+  github_deployment?: GitHubDeploymentConfig;
 }
 
 export interface ReposConfig {
