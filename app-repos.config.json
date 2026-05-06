@@ -26,7 +26,6 @@
       "enabled": true,
       "environment": "production",
       "environment_url": "https://your-deployed-app-domain.com",
-      "log_url": "https://your-server.com/monitoring?secret=<MONITORING_SECRET>",
       "description": "Deploying to self-hosted VPS",
       "auto_merge": false,
       "required_contexts": [],

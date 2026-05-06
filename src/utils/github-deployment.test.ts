@@ -18,6 +18,24 @@ function minimalConfig(overrides: Partial<GitHubDeploymentConfig> = {}): GitHubD
 // ─── resolveDeploymentConfig ─────────────────────────────────────────────────
 
 describe('resolveDeploymentConfig', () => {
+  // Ensure env vars used by auto-generation don't bleed between tests
+  let originalServerBaseUrl: string | undefined;
+  let originalMonitoringSecret: string | undefined;
+
+  beforeEach(() => {
+    originalServerBaseUrl = process.env.SERVER_BASE_URL;
+    originalMonitoringSecret = process.env.MONITORING_SECRET;
+    delete process.env.SERVER_BASE_URL;
+    delete process.env.MONITORING_SECRET;
+  });
+
+  afterEach(() => {
+    if (originalServerBaseUrl !== undefined) process.env.SERVER_BASE_URL = originalServerBaseUrl;
+    else delete process.env.SERVER_BASE_URL;
+    if (originalMonitoringSecret !== undefined) process.env.MONITORING_SECRET = originalMonitoringSecret;
+    else delete process.env.MONITORING_SECRET;
+  });
+
   it('fills in all defaults when only enabled is given', () => {
     const resolved = resolveDeploymentConfig(minimalConfig());
     expect(resolved.environment).toBe('production');
@@ -65,6 +83,41 @@ describe('resolveDeploymentConfig', () => {
     expect(resolved.transient_environment).toBe(true);
     expect(resolved.production_environment).toBe(false);
     expect(resolved.fail_deployment_on_status_error).toBe(true);
+  });
+
+  // ── log_url auto-generation ────────────────────────────────────────────────
+
+  it('auto-generates log_url from SERVER_BASE_URL and MONITORING_SECRET when log_url is not set', () => {
+    process.env.SERVER_BASE_URL = 'https://my-server.com';
+    process.env.MONITORING_SECRET = 'supersecret';
+    const resolved = resolveDeploymentConfig(minimalConfig());
+    expect(resolved.log_url).toBe('https://my-server.com/monitoring?secret=supersecret');
+  });
+
+  it('strips trailing slash from SERVER_BASE_URL when auto-generating log_url', () => {
+    process.env.SERVER_BASE_URL = 'https://my-server.com/';
+    process.env.MONITORING_SECRET = 'supersecret';
+    const resolved = resolveDeploymentConfig(minimalConfig());
+    expect(resolved.log_url).toBe('https://my-server.com/monitoring?secret=supersecret');
+  });
+
+  it('does not auto-generate log_url when only SERVER_BASE_URL is set (missing MONITORING_SECRET)', () => {
+    process.env.SERVER_BASE_URL = 'https://my-server.com';
+    const resolved = resolveDeploymentConfig(minimalConfig());
+    expect(resolved.log_url).toBeUndefined();
+  });
+
+  it('does not auto-generate log_url when only MONITORING_SECRET is set (missing SERVER_BASE_URL)', () => {
+    process.env.MONITORING_SECRET = 'supersecret';
+    const resolved = resolveDeploymentConfig(minimalConfig());
+    expect(resolved.log_url).toBeUndefined();
+  });
+
+  it('explicit log_url in config takes precedence over auto-generated one', () => {
+    process.env.SERVER_BASE_URL = 'https://my-server.com';
+    process.env.MONITORING_SECRET = 'supersecret';
+    const resolved = resolveDeploymentConfig(minimalConfig({ log_url: 'https://custom-logs.example.com' }));
+    expect(resolved.log_url).toBe('https://custom-logs.example.com');
   });
 });
 

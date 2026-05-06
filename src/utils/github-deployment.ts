@@ -17,13 +17,30 @@ interface ResolvedDeploymentConfig {
 
 /**
  * Resolve a GitHubDeploymentConfig, filling in defaults for optional fields.
+ *
+ * log_url auto-generation: if log_url is not specified in the config, the
+ * function attempts to build one from the SERVER_BASE_URL and MONITORING_SECRET
+ * environment variables: `${SERVER_BASE_URL}/monitoring?secret=${MONITORING_SECRET}`
+ * This makes deployment log links appear automatically on the GitHub Deployments
+ * page without any extra per-repo configuration.
  */
 export function resolveDeploymentConfig(cfg: GitHubDeploymentConfig): ResolvedDeploymentConfig {
   const environment = cfg.environment ?? 'production';
+
+  // Auto-generate log_url from monitoring endpoint when not explicitly configured.
+  let log_url = cfg.log_url;
+  if (!log_url) {
+    const serverBaseUrl = process.env.SERVER_BASE_URL;
+    const monitoringSecret = process.env.MONITORING_SECRET;
+    if (serverBaseUrl && monitoringSecret) {
+      log_url = `${serverBaseUrl.replace(/\/$/, '')}/monitoring?secret=${monitoringSecret}`;
+    }
+  }
+
   return {
     environment,
     environment_url: cfg.environment_url,
-    log_url: cfg.log_url,
+    log_url,
     description: cfg.description ?? 'Deploying to self-hosted VPS',
     auto_merge: cfg.auto_merge ?? false,
     required_contexts: cfg.required_contexts ?? [],

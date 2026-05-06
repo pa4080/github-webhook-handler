@@ -230,6 +230,7 @@ The application uses the following environment variables:
 - `USE_SSH`: Set to 'true' to use SSH for cloning (default: false)
 - `SSH_PRIVATE_KEY_PATH`: Path to SSH private key for private repos
 - `SSH_KEY_PASSPHRASE`: Passphrase for SSH key (if needed)
+- `SERVER_BASE_URL`: Public base URL of this webhook server (e.g. `https://webhook.your-domain.com`). Used to auto-generate deployment log links — see [GitHub Deployment Reporting](#github-deployment-reporting)
 - `GITHUB_TOKEN`: GitHub token required when `github_deployment.enabled` is `true` for any repository (see [GitHub Deployment Reporting](#github-deployment-reporting))
 
 ## GitHub Deployment Reporting
@@ -262,6 +263,23 @@ Set the `GITHUB_TOKEN` environment variable to a token with **Deployments: Read 
 
 If `github_deployment.enabled` is `false` for every repository, no token is required.
 
+### Automatic deployment log URL
+
+When GitHub Deployment reporting is enabled the handler can automatically populate the **log URL** — the link shown on GitHub's Deployments page that takes you straight to the deployment logs. No per-repository configuration is needed: just set two environment variables in `.env`:
+
+```
+SERVER_BASE_URL=https://webhook.your-domain.com
+MONITORING_SECRET=your_monitoring_secret_key_here
+```
+
+The handler constructs the log URL as:
+
+```
+${SERVER_BASE_URL}/monitoring?secret=${MONITORING_SECRET}
+```
+
+This opens the server's built-in PM2 log stream (`/monitoring`) directly from GitHub's UI. If you prefer a different URL, set `log_url` explicitly in the repository's `github_deployment` block and it will take precedence.
+
 ### Configuration reference
 
 Add a `github_deployment` block to a repository entry in `repos/config.json`:
@@ -275,7 +293,6 @@ Add a `github_deployment` block to a repository entry in `repos/config.json`:
       "enabled": true,
       "environment": "production",
       "environment_url": "https://your-snapix-domain.com",
-      "log_url": "https://your-server.com/monitoring?secret=<MONITORING_SECRET>",
       "description": "Deploying SnapiX to self-hosted VPS",
       "auto_merge": false,
       "required_contexts": [],
@@ -292,18 +309,20 @@ Add a `github_deployment` block to a repository entry in `repos/config.json`:
 }
 ```
 
-| Field                             | Type       | Default                                    | Description                                                      |
-| --------------------------------- | ---------- | ------------------------------------------ | ---------------------------------------------------------------- |
-| `enabled`                         | `boolean`  | `false`                                    | Enable GitHub Deployment reporting for this repository           |
-| `environment`                     | `string`   | `"production"`                             | Deployment environment name shown on GitHub                      |
-| `environment_url`                 | `string`   | —                                          | Public URL of the deployed application                           |
-| `log_url`                         | `string`   | —                                          | URL to deployment logs                                           |
-| `description`                     | `string`   | `"Deploying to self-hosted VPS"`           | Human-readable deployment description                            |
-| `auto_merge`                      | `boolean`  | `false`                                    | Whether GitHub should auto-merge the default branch into the ref |
-| `required_contexts`               | `string[]` | `[]`                                       | Status check contexts required before creating the deployment    |
-| `transient_environment`           | `boolean`  | `false`                                    | Whether the environment is ephemeral                             |
-| `production_environment`          | `boolean`  | `true` when `environment === "production"` | Whether this is a production environment                         |
-| `fail_deployment_on_status_error` | `boolean`  | `false`                                    | When `true`, GitHub API errors fail the overall deployment       |
+> **Note:** `log_url` is omitted above because it is auto-generated from `SERVER_BASE_URL` and `MONITORING_SECRET`. You can still set it explicitly to override the auto-generated value.
+
+| Field                             | Type       | Default                                                                                    | Description                                                      |
+| --------------------------------- | ---------- | ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------- |
+| `enabled`                         | `boolean`  | `false`                                                                                    | Enable GitHub Deployment reporting for this repository           |
+| `environment`                     | `string`   | `"production"`                                                                             | Deployment environment name shown on GitHub                      |
+| `environment_url`                 | `string`   | —                                                                                          | Public URL of the deployed application                           |
+| `log_url`                         | `string`   | Auto-generated from `SERVER_BASE_URL`+`MONITORING_SECRET`; omit to use the auto-generated URL | URL to deployment logs shown on GitHub's Deployments page    |
+| `description`                     | `string`   | `"Deploying to self-hosted VPS"`                                                           | Human-readable deployment description                            |
+| `auto_merge`                      | `boolean`  | `false`                                                                                    | Whether GitHub should auto-merge the default branch into the ref |
+| `required_contexts`               | `string[]` | `[]`                                                                                       | Status check contexts required before creating the deployment    |
+| `transient_environment`           | `boolean`  | `false`                                                                                    | Whether the environment is ephemeral                             |
+| `production_environment`          | `boolean`  | `true` when `environment === "production"`                                                 | Whether this is a production environment                         |
+| `fail_deployment_on_status_error` | `boolean`  | `false`                                                                                    | When `true`, GitHub API errors fail the overall deployment       |
 
 ### Deployment status lifecycle
 
@@ -336,6 +355,7 @@ push received → GitHub Deployment created → in_progress
 - **Deployments do not appear on GitHub**: Check that `github_deployment.enabled` is `true`, `GITHUB_TOKEN` is set, the token has **Deployments: Read and write** permission for the target repository, and that the `owner/repo` key in `repos/config.json` matches the repository's `full_name` exactly.
 - **Deployment status stuck at "in progress"**: The handler process likely crashed before it could post the final status. Check the server logs for errors.
 - **Deployment fails even though the deploy command succeeded**: Check whether `fail_deployment_on_status_error` is `true`. If so, a GitHub API error will cause the overall deployment to be reported as failed.
+- **Log URL not appearing on GitHub**: Set `SERVER_BASE_URL` and `MONITORING_SECRET` in `.env`, or set `log_url` explicitly in the `github_deployment` block.
 
 ## License
 
