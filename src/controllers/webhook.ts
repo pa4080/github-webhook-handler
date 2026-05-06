@@ -112,6 +112,12 @@ export async function handleWebhook(req: Request, res: Response): Promise<void> 
 
   process.env = { ...process.env, ...repoConfig?.env_vars };
 
+  // Apply node_options as NODE_OPTIONS env var for deployment child processes.
+  // env_vars.NODE_OPTIONS takes precedence when explicitly set.
+  if (repoConfig.node_options && !process.env.NODE_OPTIONS) {
+    process.env.NODE_OPTIONS = repoConfig.node_options;
+  }
+
   // Construct repository URL and name
   const repoName = repo.replace(/\.git$/, '');
   const httpsUrl = `https://github.com/${owner}/${repo}`;
@@ -164,7 +170,7 @@ export async function handleWebhook(req: Request, res: Response): Promise<void> 
       console.log(`Starting deployment commands for "${repository}" in directory: ${repoDir}`);
 
       for (const command of repoConfig.commands) {
-        await executeDeployment(command, repoDir);
+        await executeDeployment(command, repoDir, repoConfig.timeout);
       }
 
       console.log('Deployment completed successfully!');

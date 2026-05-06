@@ -85,7 +85,17 @@ export interface RepoConfig {
   ssh_key_path?: string;
   ssh_key_passphrase?: string;
   env_vars?: Record<string, string>;
+  /** Sets the NODE_OPTIONS environment variable for all deployment commands.
+   *  Use this to increase the Node.js heap limit when a command (e.g. a
+   *  Next.js build) runs out of memory.
+   *  Example: "--max-old-space-size=4096"
+   */
+  node_options?: string;
   health_check_url?: string;
+  /** Maximum time in seconds to wait for each deployment command to finish.
+   *  The process is killed with SIGTERM if the timeout is exceeded.
+   *  Defaults to no limit when unset.
+   */
   timeout?: number;
   max_retries?: number;
   retry_delay?: number;

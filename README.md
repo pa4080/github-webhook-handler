@@ -212,12 +212,13 @@ For more details see [app-repos.config.json](app-repos.config.json) for an examp
 - `package_manager`: Package manager to use (npm, pnpm, yarn)
 - `ssh_key_path`: Path to SSH private key for private repos
 - `ssh_key_passphrase`: Passphrase for SSH key (if needed)
-- `env_vars`: Environment variables to set
+- `env_vars`: Environment variables to set for all deployment commands
+- `node_options`: Node.js CLI flags applied via `NODE_OPTIONS` for all deployment child processes (e.g. `"--max-old-space-size=4096"` to raise the heap limit). An explicit `NODE_OPTIONS` in `env_vars` always takes precedence.
 - `pre_deploy_commands`: Commands to run before deployment
 - `post_deploy_commands`: Commands to run after deployment
 - `notifications`: Notification settings (Slack, email)
 - `health_check_url`: URL to check after deployment
-- `timeout`: Deployment timeout in seconds
+- `timeout`: Per-command timeout in seconds — the process is sent SIGTERM if exceeded
 - `max_retries`: Maximum retry attempts
 - `retry_delay`: Delay between retries in seconds
 
@@ -357,6 +358,7 @@ push received → GitHub Deployment created → in_progress
 - Verify signature calculation if you receive 401 Unauthorized errors
 - Ensure any deployment commands are correctly configured in the `.env` file
 - Validate SSH access by manually trying to clone the repository using the same SSH key
+- **Deployment command killed / JavaScript heap out of memory**: A build step (e.g. Next.js) ran out of memory. Add `"node_options": "--max-old-space-size=4096"` (or a higher value) to the repository entry in `repos/config.json` to increase the Node.js heap limit for all deployment commands.
 
 ### GitHub Deployment Reporting Troubleshooting
 
