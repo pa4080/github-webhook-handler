@@ -139,11 +139,16 @@ export async function handleWebhook(req: Request, res: Response): Promise<void> 
     : null;
 
   // Create GitHub deployment and mark as in_progress (best-effort)
+  // Skip if commit SHA could not be resolved — an invalid ref would be rejected by GitHub anyway.
   let ghDeploymentId: number | null = null;
   if (ghDepCfg) {
-    ghDeploymentId = await createGitHubDeployment(owner, repoName, commitSha, ghDepCfg);
-    if (ghDeploymentId !== null) {
-      await createGitHubDeploymentStatus(owner, repoName, ghDeploymentId, 'in_progress', ghDepCfg);
+    if (commitSha === 'unknown') {
+      console.warn('[github-deployment] Skipping GitHub Deployment creation: commit SHA could not be determined from push payload.');
+    } else {
+      ghDeploymentId = await createGitHubDeployment(owner, repoName, commitSha, ghDepCfg);
+      if (ghDeploymentId !== null) {
+        await createGitHubDeploymentStatus(owner, repoName, ghDeploymentId, 'in_progress', ghDepCfg);
+      }
     }
   }
 
