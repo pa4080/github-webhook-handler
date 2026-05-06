@@ -286,7 +286,6 @@ ${SERVER_BASE_URL}/monitoring?token=<hmac>&repo=<owner%2Frepo>&ts=<timestamp>
 This opens the server's built-in PM2 log stream (`/monitoring`) filtered to that repository's log output, directly from GitHub's UI. If you prefer a different URL, set `log_url` explicitly in the repository's `github_deployment` block and it will take precedence.
 
 > **Security note:** The auto-generated `log_url` is visible to everyone with repository access via GitHub's Deployments API and UI. Each deployment link is unique and repo-scoped, but `MONITORING_SECRET` remains the root of trust. If your repository is public or has a wide collaborator base, consider setting `log_url` to an alternative log URL.
-
 > **Backward compatibility:** The `/monitoring?secret=<MONITORING_SECRET>` endpoint continues to work and streams all logs without repo filtering.
 
 ### Configuration reference
