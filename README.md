@@ -267,14 +267,14 @@ If `github_deployment.enabled` is `false` for every repository, no token is requ
 
 When GitHub Deployment reporting is enabled the handler can automatically populate the **log URL** — the link shown on GitHub's Deployments page that takes you straight to the deployment logs. No per-repository configuration is needed: just set two environment variables in `.env`:
 
-```
+```ts
 SERVER_BASE_URL=https://webhook.your-domain.com
 MONITORING_SECRET=your_monitoring_secret_key_here
 ```
 
 The handler constructs a **unique, per-deployment signed log URL** for each deployment:
 
-```
+```ts
 ${SERVER_BASE_URL}/monitoring?token=<hmac>&repo=<owner%2Frepo>&ts=<timestamp>
 ```
 
@@ -319,18 +319,18 @@ Add a `github_deployment` block to a repository entry in `repos/config.json`:
 
 > **Note:** `log_url` is omitted above because it is auto-generated from `SERVER_BASE_URL` and `MONITORING_SECRET`. You can still set it explicitly to override the auto-generated value.
 
-| Field                             | Type       | Default                                                                                    | Description                                                      |
-| --------------------------------- | ---------- | ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------- |
-| `enabled`                         | `boolean`  | `false`                                                                                    | Enable GitHub Deployment reporting for this repository           |
-| `environment`                     | `string`   | `"production"`                                                                             | Deployment environment name shown on GitHub                      |
-| `environment_url`                 | `string`   | —                                                                                          | Public URL of the deployed application                           |
-| `log_url`                         | `string`   | Auto-generated from `SERVER_BASE_URL`+`MONITORING_SECRET`; omit to use the auto-generated URL | URL to deployment logs shown on GitHub's Deployments page    |
-| `description`                     | `string`   | `"Deploying to self-hosted VPS"`                                                           | Human-readable deployment description                            |
-| `auto_merge`                      | `boolean`  | `false`                                                                                    | Whether GitHub should auto-merge the default branch into the ref |
-| `required_contexts`               | `string[]` | `[]`                                                                                       | Status check contexts required before creating the deployment    |
-| `transient_environment`           | `boolean`  | `false`                                                                                    | Whether the environment is ephemeral                             |
-| `production_environment`          | `boolean`  | `true` when `environment === "production"`                                                 | Whether this is a production environment                         |
-| `fail_deployment_on_status_error` | `boolean`  | `false`                                                                                    | When `true`, GitHub API errors fail the overall deployment       |
+| Field                             | Type       | Default                                                                                       | Description                                                      |
+| --------------------------------- | ---------- | --------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| `enabled`                         | `boolean`  | `false`                                                                                       | Enable GitHub Deployment reporting for this repository           |
+| `environment`                     | `string`   | `"production"`                                                                                | Deployment environment name shown on GitHub                      |
+| `environment_url`                 | `string`   | —                                                                                             | Public URL of the deployed application                           |
+| `log_url`                         | `string`   | Auto-generated from `SERVER_BASE_URL`+`MONITORING_SECRET`; omit to use the auto-generated URL | URL to deployment logs shown on GitHub's Deployments page        |
+| `description`                     | `string`   | `"Deploying to self-hosted VPS"`                                                              | Human-readable deployment description                            |
+| `auto_merge`                      | `boolean`  | `false`                                                                                       | Whether GitHub should auto-merge the default branch into the ref |
+| `required_contexts`               | `string[]` | `[]`                                                                                          | Status check contexts required before creating the deployment    |
+| `transient_environment`           | `boolean`  | `false`                                                                                       | Whether the environment is ephemeral                             |
+| `production_environment`          | `boolean`  | `true` when `environment === "production"`                                                    | Whether this is a production environment                         |
+| `fail_deployment_on_status_error` | `boolean`  | `false`                                                                                       | When `true`, GitHub API errors fail the overall deployment       |
 
 ### Deployment status lifecycle
 
