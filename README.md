@@ -236,7 +236,7 @@ The application uses the following environment variables:
 
 The webhook handler can optionally create GitHub Deployment records and update their status during self-hosted deployments. This allows deployments from a VPS to appear in the GitHub repository deployments page:
 
-```
+```bash
 https://github.com/<owner>/<repo>/deployments
 ```
 
@@ -255,10 +255,10 @@ If GitHub API calls fail and `fail_deployment_on_status_error` is `false` (the d
 
 Set the `GITHUB_TOKEN` environment variable to a token with **Deployments: Read and write** access for the target repository:
 
-| Token type | Required permission |
-|---|---|
+| Token type       | Required permission                                        |
+| ---------------- | ---------------------------------------------------------- |
 | Fine-grained PAT | Target repository access + **Deployments: Read and write** |
-| GitHub App | Repository permission **Deployments: Read and write** |
+| GitHub App       | Repository permission **Deployments: Read and write**      |
 
 If `github_deployment.enabled` is `false` for every repository, no token is required.
 
@@ -276,33 +276,38 @@ Add a `github_deployment` block to a repository entry in `repos/config.json`:
       "environment": "production",
       "environment_url": "https://your-snapix-domain.com",
       "log_url": "https://your-server.com/monitoring?secret=<MONITORING_SECRET>",
-      "description": "Deploying Snapix to self-hosted VPS",
+      "description": "Deploying SnapiX to self-hosted VPS",
       "auto_merge": false,
       "required_contexts": [],
       "transient_environment": false,
       "production_environment": true,
       "fail_deployment_on_status_error": false
+    },
+    "env_vars": {
+        "GITHUB_TOKEN": "your-github-token-here if it is repo-specific, otherwise set it in the .env file",
+        "NODE_ENV": "production",
+        "USE_SSH": "true"
     }
   }
 }
 ```
 
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `enabled` | `boolean` | `false` | Enable GitHub Deployment reporting for this repository |
-| `environment` | `string` | `"production"` | Deployment environment name shown on GitHub |
-| `environment_url` | `string` | — | Public URL of the deployed application |
-| `log_url` | `string` | — | URL to deployment logs |
-| `description` | `string` | `"Deploying to self-hosted VPS"` | Human-readable deployment description |
-| `auto_merge` | `boolean` | `false` | Whether GitHub should auto-merge the default branch into the ref |
-| `required_contexts` | `string[]` | `[]` | Status check contexts required before creating the deployment |
-| `transient_environment` | `boolean` | `false` | Whether the environment is ephemeral |
-| `production_environment` | `boolean` | `true` when `environment === "production"` | Whether this is a production environment |
-| `fail_deployment_on_status_error` | `boolean` | `false` | When `true`, GitHub API errors fail the overall deployment |
+| Field                             | Type       | Default                                    | Description                                                      |
+| --------------------------------- | ---------- | ------------------------------------------ | ---------------------------------------------------------------- |
+| `enabled`                         | `boolean`  | `false`                                    | Enable GitHub Deployment reporting for this repository           |
+| `environment`                     | `string`   | `"production"`                             | Deployment environment name shown on GitHub                      |
+| `environment_url`                 | `string`   | —                                          | Public URL of the deployed application                           |
+| `log_url`                         | `string`   | —                                          | URL to deployment logs                                           |
+| `description`                     | `string`   | `"Deploying to self-hosted VPS"`           | Human-readable deployment description                            |
+| `auto_merge`                      | `boolean`  | `false`                                    | Whether GitHub should auto-merge the default branch into the ref |
+| `required_contexts`               | `string[]` | `[]`                                       | Status check contexts required before creating the deployment    |
+| `transient_environment`           | `boolean`  | `false`                                    | Whether the environment is ephemeral                             |
+| `production_environment`          | `boolean`  | `true` when `environment === "production"` | Whether this is a production environment                         |
+| `fail_deployment_on_status_error` | `boolean`  | `false`                                    | When `true`, GitHub API errors fail the overall deployment       |
 
 ### Deployment status lifecycle
 
-```
+```bash
 push received → GitHub Deployment created → in_progress
                                                   ↓
                                          run deploy commands
@@ -326,7 +331,7 @@ push received → GitHub Deployment created → in_progress
 - Ensure any deployment commands are correctly configured in the `.env` file
 - Validate SSH access by manually trying to clone the repository using the same SSH key
 
-### GitHub Deployment Reporting
+### GitHub Deployment Reporting Troubleshooting
 
 - **Deployments do not appear on GitHub**: Check that `github_deployment.enabled` is `true`, `GITHUB_TOKEN` is set, the token has **Deployments: Read and write** permission for the target repository, and that the `owner/repo` key in `repos/config.json` matches the repository's `full_name` exactly.
 - **Deployment status stuck at "in progress"**: The handler process likely crashed before it could post the final status. Check the server logs for errors.
