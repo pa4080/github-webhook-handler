@@ -12,7 +12,8 @@
     "ssh_key_passphrase": "optional_passphrase_if_your_key_has_one",
     "env_vars": {
       "NODE_ENV": "production",
-      "PORT": "3000"
+      "PORT": "3000",
+      "NODE_OPTIONS": "--max-old-space-size=4096"
     },
     "notifications": {
       "slack_webhook": "https://hooks.slack.com/services/...",
@@ -21,6 +22,17 @@
     "health_check_url": "https://example.com/health",
     "timeout": 300,
     "max_retries": 3,
-    "retry_delay": 30
+    "retry_delay": 30,
+    "github_deployment": {
+      "enabled": true,
+      "environment": "production",
+      "environment_url": "https://your-deployed-app-domain.com",
+      "description": "Deploying to self-hosted VPS",
+      "auto_merge": false,
+      "required_contexts": [],
+      "transient_environment": false,
+      "production_environment": true,
+      "fail_deployment_on_status_error": false
+    }
   }
 }

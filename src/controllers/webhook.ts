@@ -1,9 +1,15 @@
 import { Request, Response } from 'express';
+import fs from 'fs';
 import path from 'path';
 import { verifySignature } from '../utils/webhook';
 import { getRepoConfig, DEFAULT_BRANCH } from '../config';
 import { cloneOrPullRepository } from '../utils/git';
 import { executeDeployment } from '../utils/deployment';
+import {
+  resolveDeploymentConfig,
+  createGitHubDeployment,
+  createGitHubDeploymentStatus,
+} from '../utils/github-deployment';
 import { WebhookPayload, RepoConfig } from '../types';
 
 /**
@@ -52,6 +58,7 @@ export async function handleWebhook(req: Request, res: Response): Promise<void> 
   // Extract repository information based on event type
   let repository = '';
   let branch = '';
+  let commitSha = 'unknown';
   let skipDeployment = true;
 
   if (payload.event === 'push') {
@@ -69,8 +76,8 @@ export async function handleWebhook(req: Request, res: Response): Promise<void> 
     // Extract branch name from ref (refs/heads/master -> master)
     branch = payload.ref ? payload.ref.replace('refs/heads/', '') : DEFAULT_BRANCH;
 
-    // Extract useful commit information
-    const commitSha = payload.head_commit?.id || payload.after || 'unknown';
+    // Extract useful commit information — prefer payload.after for exact deployed SHA
+    commitSha = payload.after || payload.head_commit?.id || 'unknown';
     const commitMessage = payload.head_commit?.message || 'No commit message';
     const commitAuthor = payload.head_commit?.author?.username || payload.head_commit?.author?.name || 'unknown';
 
@@ -127,24 +134,66 @@ export async function handleWebhook(req: Request, res: Response): Promise<void> 
 
   const startTime = Date.now();
 
+  // Resolve GitHub Deployment config (if enabled)
+  const ghDepCfg = repoConfig.github_deployment?.enabled
+    ? resolveDeploymentConfig(repoConfig.github_deployment, repository)
+    : null;
+
+  // Open a per-repo log file when the monitoring URL was auto-generated so the
+  // monitoring endpoint can serve it directly instead of filtering pm2 logs.
+  let logStream: fs.WriteStream | undefined;
+  if (ghDepCfg?.deploymentTs) {
+    const logDir = path.join(process.cwd(), 'logs');
+    fs.mkdirSync(logDir, { recursive: true });
+    // Sanitize path segments to prevent path traversal from crafted repo names
+    const safeOwner = owner.replace(/[^a-zA-Z0-9_.-]/g, '_');
+    const safeRepoName = repoName.replace(/[^a-zA-Z0-9_.-]/g, '_');
+    const logPath = path.join(logDir, `${safeOwner}_${safeRepoName}_${ghDepCfg.deploymentTs}.log`);
+    logStream = fs.createWriteStream(logPath, { flags: 'a' });
+    logStream.write(`=== Deployment of ${repository} @ ${commitSha.substring(0, 8)} started at ${new Date().toISOString()} ===\n`);
+  }
+
+  // Create GitHub deployment and mark as in_progress (best-effort)
+  // Skip if commit SHA could not be resolved — an invalid ref would be rejected by GitHub anyway.
+  let ghDeploymentId: number | null = null;
+  if (ghDepCfg) {
+    if (commitSha === 'unknown') {
+      console.warn('[github-deployment] Skipping GitHub Deployment creation: commit SHA could not be determined from push payload.');
+    } else {
+      ghDeploymentId = await createGitHubDeployment(owner, repoName, commitSha, ghDepCfg);
+      if (ghDeploymentId !== null) {
+        await createGitHubDeploymentStatus(owner, repoName, ghDeploymentId, 'in_progress', ghDepCfg);
+      }
+    }
+  }
+
+  let deploymentFailed = false;
   try {
     console.log(`Cloning/pulling from: ${cloneUrl}`);
 
     const repoDir = path.join(process.cwd(), 'repos', `${owner}_${repoName}`);
 
+    logStream?.write(`[git] Cloning/pulling from: ${cloneUrl}\n`);
     await cloneOrPullRepository(cloneUrl, repoDir, repoConfig);
     console.log(`Successfully pulled latest changes for ${repository}`);
+    logStream?.write(`[git] Successfully pulled latest changes\n`);
 
     if (repoConfig.commands && repoConfig.commands.length > 0) {
       console.log(`Starting deployment commands for "${repository}" in directory: ${repoDir}`);
 
       for (const command of repoConfig.commands) {
-        await executeDeployment(command, repoDir);
+        logStream?.write(`\n[command] ${command}\n`);
+        await executeDeployment(command, repoDir, repoConfig.timeout, logStream);
       }
 
       console.log('Deployment completed successfully!');
     } else {
       console.log(`No deployment commands to execute for "${repository}"`);
+    }
+
+    // Report success to GitHub
+    if (ghDepCfg && ghDeploymentId !== null) {
+      await createGitHubDeploymentStatus(owner, repoName, ghDeploymentId, 'success', ghDepCfg);
     }
 
     // Send health check if configured
@@ -162,9 +211,24 @@ export async function handleWebhook(req: Request, res: Response): Promise<void> 
       }
     }
   } catch (error) {
+    deploymentFailed = true;
     console.error('Deployment failed:', error instanceof Error ? error.message : String(error));
+    logStream?.write(`\n[error] ${error instanceof Error ? error.message : String(error)}\n`);
+
+    // Report failure to GitHub (best-effort)
+    if (ghDepCfg && ghDeploymentId !== null) {
+      await createGitHubDeploymentStatus(owner, repoName, ghDeploymentId, 'failure', ghDepCfg);
+    }
   }
 
   const duration = ((Date.now() - startTime) / 1000).toFixed(2);
   console.log(`Processing "${repository}" completed in ${duration}s`);
+
+  // Write final marker so the monitoring endpoint knows streaming can stop
+  if (logStream) {
+    const finalLine = deploymentFailed
+      ? `\n=== Deployment FAILED after ${duration}s ===\n`
+      : `\n=== Deployment COMPLETED in ${duration}s ===\n`;
+    logStream.write(finalLine + '[DEPLOYMENT DONE]\n', () => logStream.end());
+  }
 }
