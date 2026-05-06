@@ -280,6 +280,8 @@ ${SERVER_BASE_URL}/monitoring?secret=${MONITORING_SECRET}
 
 This opens the server's built-in PM2 log stream (`/monitoring`) directly from GitHub's UI. If you prefer a different URL, set `log_url` explicitly in the repository's `github_deployment` block and it will take precedence.
 
+> **Security note:** The auto-generated `log_url` includes `MONITORING_SECRET` as a query parameter. GitHub stores this URL in its Deployments API and displays it in the repository UI, so it is visible to everyone with repository access (collaborators, contributors with write access, etc.). This is consistent with the existing monitoring endpoint design — `MONITORING_SECRET` is already intended to be used as a shared URL secret, not a user-facing credential. If your repository is public or has a wide collaborator base, consider setting `log_url` to an alternative log URL that does not embed a secret.
+
 ### Configuration reference
 
 Add a `github_deployment` block to a repository entry in `repos/config.json`:
