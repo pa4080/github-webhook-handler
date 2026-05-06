@@ -1,13 +1,15 @@
 import { spawn } from 'child_process';
+import { WriteStream } from 'fs';
 
 /**
  * Execute a deployment command in the specified directory with real-time output
  * @param command The command to execute
  * @param cwd Working directory for command execution
  * @param timeoutSec Optional timeout in seconds; the process is killed if exceeded
+ * @param logStream Optional writable stream to tee all output into (in addition to process stdout/stderr)
  * @returns Promise that resolves when the process exits
  */
-export async function executeDeployment(command: string, cwd: string, timeoutSec?: number): Promise<void> {
+export async function executeDeployment(command: string, cwd: string, timeoutSec?: number, logStream?: WriteStream): Promise<void> {
   console.log(`Executing command: "${command}"${timeoutSec ? ` (timeout: ${timeoutSec}s)` : ''}`);
 
   return new Promise((resolve, reject) => {
@@ -36,11 +38,13 @@ export async function executeDeployment(command: string, cwd: string, timeoutSec
     // Handle stdout in real-time
     child.stdout.on('data', (data) => {
       process.stdout.write(data); // Write to console in real-time
+      logStream?.write(data);
     });
 
     // Handle stderr in real-time
     child.stderr.on('data', (data) => {
       process.stderr.write(data); // Write errors to console in real-time
+      logStream?.write(data);
     });
 
     // Handle process exit

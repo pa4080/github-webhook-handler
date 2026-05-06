@@ -108,6 +108,8 @@ describe('resolveDeploymentConfig', () => {
     expect(Number(ts)).toBeLessThanOrEqual(after);
     const token = url.searchParams.get('token')!;
     expect(token).toBe(buildMonitoringToken('supersecret', REPO_FULL_NAME, ts));
+    // deploymentTs must match the ts embedded in the URL
+    expect(resolved.deploymentTs).toBe(ts);
   });
 
   it('strips trailing slash from SERVER_BASE_URL when auto-generating log_url', () => {
@@ -127,6 +129,18 @@ describe('resolveDeploymentConfig', () => {
     process.env.MONITORING_SECRET = 'supersecret';
     const resolved = resolveDeploymentConfig(minimalConfig(), REPO_FULL_NAME);
     expect(resolved.log_url).toBeUndefined();
+  });
+
+  it('does not set deploymentTs when log_url is explicitly provided', () => {
+    process.env.SERVER_BASE_URL = 'https://my-server.com';
+    process.env.MONITORING_SECRET = 'supersecret';
+    const resolved = resolveDeploymentConfig(minimalConfig({ log_url: 'https://custom-logs.example.com' }), REPO_FULL_NAME);
+    expect(resolved.deploymentTs).toBeUndefined();
+  });
+
+  it('does not set deploymentTs when env vars for auto-generation are absent', () => {
+    const resolved = resolveDeploymentConfig(minimalConfig(), REPO_FULL_NAME);
+    expect(resolved.deploymentTs).toBeUndefined();
   });
 
   it('explicit log_url in config takes precedence over auto-generated one', () => {

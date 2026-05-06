@@ -8,6 +8,12 @@ interface ResolvedDeploymentConfig {
   environment: string;
   environment_url?: string;
   log_url?: string;
+  /** The timestamp string used when auto-generating log_url.
+   *  Present only when log_url was auto-generated from SERVER_BASE_URL +
+   *  MONITORING_SECRET. Used by the webhook controller to name the per-repo
+   *  log file so the monitoring endpoint can locate it via the same ts param.
+   */
+  deploymentTs?: string;
   description: string;
   auto_merge: boolean;
   required_contexts: string[];
@@ -63,11 +69,13 @@ export function resolveDeploymentConfig(
 
   // Auto-generate log_url from monitoring endpoint when not explicitly configured.
   let log_url = cfg.log_url;
+  let deploymentTs: string | undefined;
   if (!log_url) {
     const serverBaseUrl = process.env.SERVER_BASE_URL;
     const monitoringSecret = process.env.MONITORING_SECRET;
     if (serverBaseUrl && monitoringSecret) {
       const ts = Date.now().toString();
+      deploymentTs = ts;
       const token = buildMonitoringToken(monitoringSecret, repoFullName, ts);
       const base = serverBaseUrl.replace(/\/$/, '');
       log_url = `${base}/monitoring?token=${token}&repo=${encodeURIComponent(repoFullName)}&ts=${ts}`;
@@ -78,6 +86,7 @@ export function resolveDeploymentConfig(
     environment,
     environment_url: cfg.environment_url,
     log_url,
+    deploymentTs,
     description: cfg.description ?? 'Deploying to self-hosted VPS',
     auto_merge: cfg.auto_merge ?? false,
     required_contexts: cfg.required_contexts ?? [],

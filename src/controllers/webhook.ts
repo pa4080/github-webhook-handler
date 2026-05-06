@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import fs from 'fs';
 import path from 'path';
 import { verifySignature } from '../utils/webhook';
 import { getRepoConfig, DEFAULT_BRANCH } from '../config';
@@ -112,12 +113,6 @@ export async function handleWebhook(req: Request, res: Response): Promise<void> 
 
   process.env = { ...process.env, ...repoConfig?.env_vars };
 
-  // Apply node_options as NODE_OPTIONS env var for deployment child processes.
-  // env_vars.NODE_OPTIONS takes precedence when explicitly set.
-  if (repoConfig.node_options && !process.env.NODE_OPTIONS) {
-    process.env.NODE_OPTIONS = repoConfig.node_options;
-  }
-
   // Construct repository URL and name
   const repoName = repo.replace(/\.git$/, '');
   const httpsUrl = `https://github.com/${owner}/${repo}`;
@@ -144,6 +139,20 @@ export async function handleWebhook(req: Request, res: Response): Promise<void> 
     ? resolveDeploymentConfig(repoConfig.github_deployment, repository)
     : null;
 
+  // Open a per-repo log file when the monitoring URL was auto-generated so the
+  // monitoring endpoint can serve it directly instead of filtering pm2 logs.
+  let logStream: fs.WriteStream | undefined;
+  if (ghDepCfg?.deploymentTs) {
+    const logDir = path.join(process.cwd(), 'logs');
+    fs.mkdirSync(logDir, { recursive: true });
+    // Sanitize path segments to prevent path traversal from crafted repo names
+    const safeOwner = owner.replace(/[^a-zA-Z0-9_.-]/g, '_');
+    const safeRepoName = repoName.replace(/[^a-zA-Z0-9_.-]/g, '_');
+    const logPath = path.join(logDir, `${safeOwner}_${safeRepoName}_${ghDepCfg.deploymentTs}.log`);
+    logStream = fs.createWriteStream(logPath, { flags: 'a' });
+    logStream.write(`=== Deployment of ${repository} @ ${commitSha.substring(0, 8)} started at ${new Date().toISOString()} ===\n`);
+  }
+
   // Create GitHub deployment and mark as in_progress (best-effort)
   // Skip if commit SHA could not be resolved — an invalid ref would be rejected by GitHub anyway.
   let ghDeploymentId: number | null = null;
@@ -158,19 +167,23 @@ export async function handleWebhook(req: Request, res: Response): Promise<void> 
     }
   }
 
+  let deploymentFailed = false;
   try {
     console.log(`Cloning/pulling from: ${cloneUrl}`);
 
     const repoDir = path.join(process.cwd(), 'repos', `${owner}_${repoName}`);
 
+    logStream?.write(`[git] Cloning/pulling from: ${cloneUrl}\n`);
     await cloneOrPullRepository(cloneUrl, repoDir, repoConfig);
     console.log(`Successfully pulled latest changes for ${repository}`);
+    logStream?.write(`[git] Successfully pulled latest changes\n`);
 
     if (repoConfig.commands && repoConfig.commands.length > 0) {
       console.log(`Starting deployment commands for "${repository}" in directory: ${repoDir}`);
 
       for (const command of repoConfig.commands) {
-        await executeDeployment(command, repoDir, repoConfig.timeout);
+        logStream?.write(`\n[command] ${command}\n`);
+        await executeDeployment(command, repoDir, repoConfig.timeout, logStream);
       }
 
       console.log('Deployment completed successfully!');
@@ -198,7 +211,9 @@ export async function handleWebhook(req: Request, res: Response): Promise<void> 
       }
     }
   } catch (error) {
+    deploymentFailed = true;
     console.error('Deployment failed:', error instanceof Error ? error.message : String(error));
+    logStream?.write(`\n[error] ${error instanceof Error ? error.message : String(error)}\n`);
 
     // Report failure to GitHub (best-effort)
     if (ghDepCfg && ghDeploymentId !== null) {
@@ -208,4 +223,12 @@ export async function handleWebhook(req: Request, res: Response): Promise<void> 
 
   const duration = ((Date.now() - startTime) / 1000).toFixed(2);
   console.log(`Processing "${repository}" completed in ${duration}s`);
+
+  // Write final marker so the monitoring endpoint knows streaming can stop
+  if (logStream) {
+    const finalLine = deploymentFailed
+      ? `\n=== Deployment FAILED after ${duration}s ===\n`
+      : `\n=== Deployment COMPLETED in ${duration}s ===\n`;
+    logStream.write(finalLine + '[DEPLOYMENT DONE]\n', () => logStream.end());
+  }
 }

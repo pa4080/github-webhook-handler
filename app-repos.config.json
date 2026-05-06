@@ -12,9 +12,9 @@
     "ssh_key_passphrase": "optional_passphrase_if_your_key_has_one",
     "env_vars": {
       "NODE_ENV": "production",
-      "PORT": "3000"
+      "PORT": "3000",
+      "NODE_OPTIONS": "--max-old-space-size=4096"
     },
-    "node_options": "--max-old-space-size=4096",
     "notifications": {
       "slack_webhook": "https://hooks.slack.com/services/...",
       "email": "devops@example.com"
