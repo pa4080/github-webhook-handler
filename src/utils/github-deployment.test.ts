@@ -2,6 +2,8 @@ import {
   resolveDeploymentConfig,
   createGitHubDeployment,
   createGitHubDeploymentStatus,
+  buildMonitoringToken,
+  verifyMonitoringToken,
 } from './github-deployment';
 import { GitHubDeploymentConfig } from '../types';
 
@@ -14,6 +16,8 @@ import { GitHubDeploymentConfig } from '../types';
 function minimalConfig(overrides: Partial<GitHubDeploymentConfig> = {}): GitHubDeploymentConfig {
   return { enabled: true, ...overrides };
 }
+
+const REPO_FULL_NAME = 'pa4080/snapix';
 
 // ─── resolveDeploymentConfig ─────────────────────────────────────────────────
 
@@ -37,7 +41,7 @@ describe('resolveDeploymentConfig', () => {
   });
 
   it('fills in all defaults when only enabled is given', () => {
-    const resolved = resolveDeploymentConfig(minimalConfig());
+    const resolved = resolveDeploymentConfig(minimalConfig(), REPO_FULL_NAME);
     expect(resolved.environment).toBe('production');
     expect(resolved.description).toBe('Deploying to self-hosted VPS');
     expect(resolved.auto_merge).toBe(false);
@@ -50,13 +54,14 @@ describe('resolveDeploymentConfig', () => {
   });
 
   it('sets production_environment=false by default when environment != production', () => {
-    const resolved = resolveDeploymentConfig(minimalConfig({ environment: 'staging' }));
+    const resolved = resolveDeploymentConfig(minimalConfig({ environment: 'staging' }), REPO_FULL_NAME);
     expect(resolved.production_environment).toBe(false);
   });
 
   it('respects explicit production_environment override', () => {
     const resolved = resolveDeploymentConfig(
-      minimalConfig({ environment: 'staging', production_environment: true })
+      minimalConfig({ environment: 'staging', production_environment: true }),
+      REPO_FULL_NAME
     );
     expect(resolved.production_environment).toBe(true);
   });
@@ -73,7 +78,7 @@ describe('resolveDeploymentConfig', () => {
       production_environment: false,
       fail_deployment_on_status_error: true,
     });
-    const resolved = resolveDeploymentConfig(cfg);
+    const resolved = resolveDeploymentConfig(cfg, REPO_FULL_NAME);
     expect(resolved.environment).toBe('staging');
     expect(resolved.environment_url).toBe('https://staging.example.com');
     expect(resolved.log_url).toBe('https://logs.example.com');
@@ -87,37 +92,113 @@ describe('resolveDeploymentConfig', () => {
 
   // ── log_url auto-generation ────────────────────────────────────────────────
 
-  it('auto-generates log_url from SERVER_BASE_URL and MONITORING_SECRET when log_url is not set', () => {
+  it('auto-generates log_url with HMAC token, repo, and ts when both env vars are set', () => {
     process.env.SERVER_BASE_URL = 'https://my-server.com';
     process.env.MONITORING_SECRET = 'supersecret';
-    const resolved = resolveDeploymentConfig(minimalConfig());
-    expect(resolved.log_url).toBe('https://my-server.com/monitoring?secret=supersecret');
+    const before = Date.now();
+    const resolved = resolveDeploymentConfig(minimalConfig(), REPO_FULL_NAME);
+    const after = Date.now();
+
+    expect(resolved.log_url).toBeDefined();
+    const url = new URL(resolved.log_url!);
+    expect(url.origin + url.pathname).toBe('https://my-server.com/monitoring');
+    expect(url.searchParams.get('repo')).toBe(REPO_FULL_NAME);
+    const ts = url.searchParams.get('ts')!;
+    expect(Number(ts)).toBeGreaterThanOrEqual(before);
+    expect(Number(ts)).toBeLessThanOrEqual(after);
+    const token = url.searchParams.get('token')!;
+    expect(token).toBe(buildMonitoringToken('supersecret', REPO_FULL_NAME, ts));
   });
 
   it('strips trailing slash from SERVER_BASE_URL when auto-generating log_url', () => {
     process.env.SERVER_BASE_URL = 'https://my-server.com/';
     process.env.MONITORING_SECRET = 'supersecret';
-    const resolved = resolveDeploymentConfig(minimalConfig());
-    expect(resolved.log_url).toBe('https://my-server.com/monitoring?secret=supersecret');
+    const resolved = resolveDeploymentConfig(minimalConfig(), REPO_FULL_NAME);
+    expect(resolved.log_url).toMatch(/^https:\/\/my-server\.com\/monitoring\?/);
   });
 
   it('does not auto-generate log_url when only SERVER_BASE_URL is set (missing MONITORING_SECRET)', () => {
     process.env.SERVER_BASE_URL = 'https://my-server.com';
-    const resolved = resolveDeploymentConfig(minimalConfig());
+    const resolved = resolveDeploymentConfig(minimalConfig(), REPO_FULL_NAME);
     expect(resolved.log_url).toBeUndefined();
   });
 
   it('does not auto-generate log_url when only MONITORING_SECRET is set (missing SERVER_BASE_URL)', () => {
     process.env.MONITORING_SECRET = 'supersecret';
-    const resolved = resolveDeploymentConfig(minimalConfig());
+    const resolved = resolveDeploymentConfig(minimalConfig(), REPO_FULL_NAME);
     expect(resolved.log_url).toBeUndefined();
   });
 
   it('explicit log_url in config takes precedence over auto-generated one', () => {
     process.env.SERVER_BASE_URL = 'https://my-server.com';
     process.env.MONITORING_SECRET = 'supersecret';
-    const resolved = resolveDeploymentConfig(minimalConfig({ log_url: 'https://custom-logs.example.com' }));
+    const resolved = resolveDeploymentConfig(minimalConfig({ log_url: 'https://custom-logs.example.com' }), REPO_FULL_NAME);
     expect(resolved.log_url).toBe('https://custom-logs.example.com');
+  });
+});
+
+// ─── buildMonitoringToken / verifyMonitoringToken ────────────────────────────
+
+describe('buildMonitoringToken', () => {
+  it('produces a 32-char hex string', () => {
+    const token = buildMonitoringToken('secret', 'pa4080/snapix', '1234567890');
+    expect(token).toMatch(/^[0-9a-f]{32}$/);
+  });
+
+  it('is deterministic for the same inputs', () => {
+    const t1 = buildMonitoringToken('s', 'owner/repo', '111');
+    const t2 = buildMonitoringToken('s', 'owner/repo', '111');
+    expect(t1).toBe(t2);
+  });
+
+  it('differs when the repo changes', () => {
+    const t1 = buildMonitoringToken('s', 'owner/repo-a', '111');
+    const t2 = buildMonitoringToken('s', 'owner/repo-b', '111');
+    expect(t1).not.toBe(t2);
+  });
+
+  it('differs when the timestamp changes (unique per deployment)', () => {
+    const t1 = buildMonitoringToken('s', 'owner/repo', '111');
+    const t2 = buildMonitoringToken('s', 'owner/repo', '222');
+    expect(t1).not.toBe(t2);
+  });
+});
+
+describe('verifyMonitoringToken', () => {
+  const SECRET = 'test-monitoring-secret';
+  const REPO = 'pa4080/snapix';
+  const TS = '1700000000000';
+  const VALID_TOKEN = buildMonitoringToken(SECRET, REPO, TS);
+
+  it('accepts a valid token', () => {
+    expect(verifyMonitoringToken(VALID_TOKEN, REPO, TS, SECRET)).toBe(true);
+  });
+
+  it('rejects a tampered token', () => {
+    const tampered = VALID_TOKEN.slice(0, -1) + (VALID_TOKEN.endsWith('f') ? '0' : 'f');
+    expect(verifyMonitoringToken(tampered, REPO, TS, SECRET)).toBe(false);
+  });
+
+  it('rejects a token from a different repo', () => {
+    const otherToken = buildMonitoringToken(SECRET, 'other/repo', TS);
+    expect(verifyMonitoringToken(otherToken, REPO, TS, SECRET)).toBe(false);
+  });
+
+  it('rejects a token from a different timestamp', () => {
+    const oldToken = buildMonitoringToken(SECRET, REPO, '999');
+    expect(verifyMonitoringToken(oldToken, REPO, TS, SECRET)).toBe(false);
+  });
+
+  it('rejects when token is empty', () => {
+    expect(verifyMonitoringToken('', REPO, TS, SECRET)).toBe(false);
+  });
+
+  it('rejects when repo is empty', () => {
+    expect(verifyMonitoringToken(VALID_TOKEN, '', TS, SECRET)).toBe(false);
+  });
+
+  it('rejects when ts is empty', () => {
+    expect(verifyMonitoringToken(VALID_TOKEN, REPO, '', SECRET)).toBe(false);
   });
 });
 
@@ -142,7 +223,7 @@ const REF = 'abc1234def5678';
 // ─── createGitHubDeployment ───────────────────────────────────────────────────
 
 describe('createGitHubDeployment', () => {
-  const resolved = resolveDeploymentConfig(minimalConfig());
+  const resolved = resolveDeploymentConfig(minimalConfig(), REPO_FULL_NAME);
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -215,7 +296,8 @@ describe('createGitHubDeployment', () => {
   it('throws when API fails and fail_deployment_on_status_error=true', async () => {
     process.env.GITHUB_TOKEN = 'test-token';
     const strictCfg = resolveDeploymentConfig(
-      minimalConfig({ fail_deployment_on_status_error: true })
+      minimalConfig({ fail_deployment_on_status_error: true }),
+      REPO_FULL_NAME
     );
     mockCreateDeployment.mockRejectedValueOnce(new Error('API error'));
 
@@ -230,7 +312,7 @@ describe('createGitHubDeployment', () => {
 // ─── createGitHubDeploymentStatus ────────────────────────────────────────────
 
 describe('createGitHubDeploymentStatus', () => {
-  const resolved = resolveDeploymentConfig(minimalConfig());
+  const resolved = resolveDeploymentConfig(minimalConfig(), REPO_FULL_NAME);
   const DEPLOYMENT_ID = 42;
 
   beforeEach(() => {
@@ -276,7 +358,8 @@ describe('createGitHubDeploymentStatus', () => {
       minimalConfig({
         environment_url: 'https://example.com',
         log_url: 'https://logs.example.com',
-      })
+      }),
+      REPO_FULL_NAME
     );
 
     await createGitHubDeploymentStatus(OWNER, REPO, DEPLOYMENT_ID, 'success', cfgWithUrls);
@@ -323,7 +406,8 @@ describe('createGitHubDeploymentStatus', () => {
   it('throws when API fails and fail_deployment_on_status_error=true', async () => {
     process.env.GITHUB_TOKEN = 'test-token';
     const strictCfg = resolveDeploymentConfig(
-      minimalConfig({ fail_deployment_on_status_error: true })
+      minimalConfig({ fail_deployment_on_status_error: true }),
+      REPO_FULL_NAME
     );
     mockCreateDeploymentStatus.mockRejectedValueOnce(new Error('Network error'));
 

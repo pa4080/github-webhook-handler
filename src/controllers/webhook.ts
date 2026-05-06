@@ -135,7 +135,7 @@ export async function handleWebhook(req: Request, res: Response): Promise<void> 
 
   // Resolve GitHub Deployment config (if enabled)
   const ghDepCfg = repoConfig.github_deployment?.enabled
-    ? resolveDeploymentConfig(repoConfig.github_deployment)
+    ? resolveDeploymentConfig(repoConfig.github_deployment, repository)
     : null;
 
   // Create GitHub deployment and mark as in_progress (best-effort)

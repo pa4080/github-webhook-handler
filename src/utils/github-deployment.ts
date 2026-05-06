@@ -1,3 +1,4 @@
+import { createHmac, timingSafeEqual } from 'crypto';
 import { Octokit } from '@octokit/rest';
 import { GitHubDeploymentConfig } from '../types';
 
@@ -16,15 +17,48 @@ interface ResolvedDeploymentConfig {
 }
 
 /**
+ * Build a per-deployment HMAC token that can be verified by the monitoring endpoint.
+ * Token = first 32 hex chars of HMAC-SHA256(secret, "<repo>:<ts>")
+ */
+export function buildMonitoringToken(secret: string, repoFullName: string, ts: string): string {
+  return createHmac('sha256', secret).update(`${repoFullName}:${ts}`).digest('hex').slice(0, 32);
+}
+
+/**
+ * Verify a per-deployment monitoring token without leaking timing information.
+ */
+export function verifyMonitoringToken(
+  token: string,
+  repo: string,
+  ts: string,
+  secret: string
+): boolean {
+  if (!token || !repo || !ts) return false;
+  const expected = buildMonitoringToken(secret, repo, ts);
+  try {
+    return timingSafeEqual(Buffer.from(token), Buffer.from(expected));
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Resolve a GitHubDeploymentConfig, filling in defaults for optional fields.
  *
  * log_url auto-generation: if log_url is not specified in the config, the
- * function attempts to build one from the SERVER_BASE_URL and MONITORING_SECRET
- * environment variables: `${SERVER_BASE_URL}/monitoring?secret=${MONITORING_SECRET}`
- * This makes deployment log links appear automatically on the GitHub Deployments
- * page without any extra per-repo configuration.
+ * function attempts to build a per-deployment signed URL from the SERVER_BASE_URL
+ * and MONITORING_SECRET environment variables:
+ *   `${SERVER_BASE_URL}/monitoring?token=<hmac>&repo=<repo>&ts=<timestamp>`
+ *
+ * The token is an HMAC-SHA256 digest of "<repoFullName>:<ts>" keyed with MONITORING_SECRET,
+ * making each deployment link unique and verifiable without server-side state.
+ * The monitoring endpoint uses the token to authenticate and filters the log stream
+ * to lines related to the specific repository.
  */
-export function resolveDeploymentConfig(cfg: GitHubDeploymentConfig): ResolvedDeploymentConfig {
+export function resolveDeploymentConfig(
+  cfg: GitHubDeploymentConfig,
+  repoFullName: string
+): ResolvedDeploymentConfig {
   const environment = cfg.environment ?? 'production';
 
   // Auto-generate log_url from monitoring endpoint when not explicitly configured.
@@ -33,7 +67,10 @@ export function resolveDeploymentConfig(cfg: GitHubDeploymentConfig): ResolvedDe
     const serverBaseUrl = process.env.SERVER_BASE_URL;
     const monitoringSecret = process.env.MONITORING_SECRET;
     if (serverBaseUrl && monitoringSecret) {
-      log_url = `${serverBaseUrl.replace(/\/$/, '')}/monitoring?secret=${monitoringSecret}`;
+      const ts = Date.now().toString();
+      const token = buildMonitoringToken(monitoringSecret, repoFullName, ts);
+      const base = serverBaseUrl.replace(/\/$/, '');
+      log_url = `${base}/monitoring?token=${token}&repo=${encodeURIComponent(repoFullName)}&ts=${ts}`;
     }
   }
 

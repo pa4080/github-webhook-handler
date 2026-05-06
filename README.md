@@ -272,15 +272,21 @@ SERVER_BASE_URL=https://webhook.your-domain.com
 MONITORING_SECRET=your_monitoring_secret_key_here
 ```
 
-The handler constructs the log URL as:
+The handler constructs a **unique, per-deployment signed log URL** for each deployment:
 
 ```
-${SERVER_BASE_URL}/monitoring?secret=${MONITORING_SECRET}
+${SERVER_BASE_URL}/monitoring?token=<hmac>&repo=<owner%2Frepo>&ts=<timestamp>
 ```
 
-This opens the server's built-in PM2 log stream (`/monitoring`) directly from GitHub's UI. If you prefer a different URL, set `log_url` explicitly in the repository's `github_deployment` block and it will take precedence.
+- **`token`** — a 32-character HMAC-SHA256 signature of `"<repo>:<ts>"` keyed with `MONITORING_SECRET`, making each link unique and verifiable without server-side state.
+- **`repo`** — the full repository name (`owner/repo`), used by the monitoring endpoint to filter the PM2 log stream to lines related to that specific repository.
+- **`ts`** — the Unix timestamp (milliseconds) at deployment time, ensuring each deployment gets its own distinct URL.
 
-> **Security note:** The auto-generated `log_url` includes `MONITORING_SECRET` as a query parameter. GitHub stores this URL in its Deployments API and displays it in the repository UI, so it is visible to everyone with repository access (collaborators, contributors with write access, etc.). This is consistent with the existing monitoring endpoint design — `MONITORING_SECRET` is already intended to be used as a shared URL secret, not a user-facing credential. If your repository is public or has a wide collaborator base, consider setting `log_url` to an alternative log URL that does not embed a secret.
+This opens the server's built-in PM2 log stream (`/monitoring`) filtered to that repository's log output, directly from GitHub's UI. If you prefer a different URL, set `log_url` explicitly in the repository's `github_deployment` block and it will take precedence.
+
+> **Security note:** The auto-generated `log_url` is visible to everyone with repository access via GitHub's Deployments API and UI. Each deployment link is unique and repo-scoped, but `MONITORING_SECRET` remains the root of trust. If your repository is public or has a wide collaborator base, consider setting `log_url` to an alternative log URL.
+
+> **Backward compatibility:** The `/monitoring?secret=<MONITORING_SECRET>` endpoint continues to work and streams all logs without repo filtering.
 
 ### Configuration reference
 
