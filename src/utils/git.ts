@@ -8,6 +8,10 @@ type GitSetup = {
   cleanup: () => void;
 };
 
+function shellEscapeArg(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`;
+}
+
 /**
  * Configure and return a SimpleGit instance with SSH support.
  * SSH settings are read from process.env at call time so that per-repo
@@ -19,7 +23,11 @@ type GitSetup = {
  *   SSH_PRIVATE_KEY_PATH – filesystem path to an existing private key file
  */
 export function setupGit(): GitSetup {
-  const git = simpleGit();
+  const git = simpleGit({
+    unsafe: {
+      allowUnsafeSshCommand: true,
+    },
+  });
 
   const sshPassphrase = process.env.SSH_KEY_PASSPHRASE;
   const sshPrivateKey = process.env.SSH_PRIVATE_KEY;
@@ -54,10 +62,10 @@ export function setupGit(): GitSetup {
   }
 
   if (keyFilePath) {
-    let sshCommand = `ssh -i "${keyFilePath}" -o StrictHostKeyChecking=accept-new`;
+    let sshCommand = `ssh -i ${shellEscapeArg(keyFilePath)} -o StrictHostKeyChecking=accept-new`;
 
     if (sshPassphrase) {
-      sshCommand = `sshpass -p "${sshPassphrase}" ${sshCommand}`;
+      sshCommand = `sshpass -p ${shellEscapeArg(sshPassphrase)} ${sshCommand}`;
     }
 
     git.env('GIT_SSH_COMMAND', sshCommand);

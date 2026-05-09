@@ -1,6 +1,7 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import simpleGit from 'simple-git';
 import { cloneOrPullRepository, setupGit } from './git';
 
 const mockEnv = jest.fn();
@@ -25,12 +26,12 @@ jest.mock('simple-git', () => {
 });
 
 function extractKeyPathFromCommand(command: string): string {
-  const match = command.match(/ssh -i "([^"]+)"/);
+  const match = command.match(/ssh -i (['"])(.*?)\1/);
   if (!match) {
     throw new Error(`Could not extract key path from command: ${command}`);
   }
 
-  return match[1];
+  return match[2];
 }
 
 describe('setupGit', () => {
@@ -54,11 +55,39 @@ describe('setupGit', () => {
 
     expect(mockEnv).toHaveBeenCalledWith(
       'GIT_SSH_COMMAND',
-      expect.stringContaining(`ssh -i "${keyPath}"`)
+      expect.stringContaining(`ssh -i '${keyPath}'`)
     );
 
     cleanup();
     expect(fs.existsSync(keyPath)).toBe(true);
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  it('enables unsafe SSH command support for simple-git', () => {
+    setupGit();
+
+    expect((simpleGit as unknown as jest.Mock)).toHaveBeenCalledWith({
+      unsafe: {
+        allowUnsafeSshCommand: true,
+      },
+    });
+  });
+
+  it('escapes SSH key passphrase in GIT_SSH_COMMAND', () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'git-key-path-'));
+    const keyPath = path.join(tempDir, 'id_ed25519');
+    fs.writeFileSync(keyPath, 'key');
+    process.env.SSH_PRIVATE_KEY_PATH = keyPath;
+    process.env.SSH_KEY_PASSPHRASE = `p'ass`;
+
+    const { cleanup } = setupGit();
+
+    expect(mockEnv).toHaveBeenCalledWith(
+      'GIT_SSH_COMMAND',
+      expect.stringContaining(`sshpass -p 'p'\\''ass' ssh -i '${keyPath}'`)
+    );
+
+    cleanup();
     fs.rmSync(tempDir, { recursive: true, force: true });
   });
 
