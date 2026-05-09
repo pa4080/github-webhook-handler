@@ -188,10 +188,10 @@ Each repository is cloned into a subdirectory of `REPOS_DIR` (or `<app-dir>/repo
 
 For example, if `REPOS_DIR=/var/lib/webhook/repos` and the config contains two entries that target different branches of the same GitHub repository — written as distinct config keys — the handler clones them into separate subdirectories:
 
-| Config key | `branch` value | Checkout directory |
-|---|---|---|
-| `acme-org/website` | `main` | `/var/lib/webhook/repos/acme-org_website_main` |
-| `acme-org/website-staging` | `staging` | `/var/lib/webhook/repos/acme-org_website-staging_staging` |
+| Config key                 | `branch` value | Checkout directory                                        |
+| -------------------------- | -------------- | --------------------------------------------------------- |
+| `acme-org/website`         | `main`         | `/var/lib/webhook/repos/acme-org_website_main`            |
+| `acme-org/website-staging` | `staging`      | `/var/lib/webhook/repos/acme-org_website-staging_staging` |
 
 > **Note:** Because the `config.json` keys must be unique, deploying two different branches of the **same** repository requires separate GitHub webhooks (or a single webhook that routes to two differently named config entries). The branch-qualified directory name ensures each branch always lands in its own isolated directory regardless of how the webhook is set up.
 
@@ -215,12 +215,10 @@ cat repos/config.json
     },
     "acme-org/api-server": {
         "branch": "master",
-        "commands": [
-            "/usr/local/bin/docker-prune.sh",
-            "pnpm docker:build",
+         "commands": [
             "pnpm install",
             "pnpm backup:db",
-            "/usr/local/bin/docker-prune.sh"
+            "pnpm docker:build"
         ],
         "env_vars": {
             "NODE_ENV": "production",

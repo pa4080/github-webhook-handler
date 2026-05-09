@@ -1,21 +1,11 @@
 {
   "acme-org/website": {
     "branch": "main",
-    "commands": [
-      "pnpm install",
-      "pnpm build",
-      "pnpm docker:build"
-    ]
+    "commands": ["pnpm install", "pnpm build", "pnpm docker:build"]
   },
   "acme-org/api-server": {
     "branch": "master",
-    "commands": [
-      "/usr/local/bin/docker-prune.sh",
-      "pnpm docker:build",
-      "pnpm install",
-      "pnpm backup:db",
-      "/usr/local/bin/docker-prune.sh"
-    ],
+    "commands": ["pnpm install", "pnpm backup:db", "pnpm docker:build"],
     "env_vars": {
       "NODE_ENV": "production",
       "USE_SSH": "true",
@@ -55,11 +45,7 @@
   },
   "partner-org/shared-sdk": {
     "branch": "main",
-    "commands": [
-      "cp -f .env.local .env",
-      "pnpm i",
-      "pnpm pm2:deploy"
-    ],
+    "commands": ["cp -f .env.local .env", "pnpm i", "pnpm pm2:deploy"],
     "env_vars": {
       "NODE_ENV": "production",
       "USE_SSH": "true"
