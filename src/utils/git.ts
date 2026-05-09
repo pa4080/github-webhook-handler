@@ -57,7 +57,7 @@ export function setupGit(): GitSetup {
 
   // Configure SSH if a private key is provided
   if (keyFilePath) {
-    let sshCommand = `ssh -i "${keyFilePath}" -o StrictHostKeyChecking=no`;
+    let sshCommand = `ssh -i "${keyFilePath}" -o StrictHostKeyChecking=accept-new`;
 
     // Add passphrase if provided
     if (sshPassphrase) {

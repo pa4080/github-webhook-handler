@@ -97,6 +97,24 @@ describe('setupGit', () => {
     cleanup();
     expect(fs.existsSync(tempKeyPath)).toBe(false);
   });
+
+  it('preserves actual multiline SSH_PRIVATE_KEY content', () => {
+    process.env.SSH_PRIVATE_KEY = `-----BEGIN OPENSSH PRIVATE KEY-----
+abc123
+-----END OPENSSH PRIVATE KEY-----`;
+
+    const { cleanup } = setupGit();
+
+    const sshCommand = mockEnv.mock.calls[0][1] as string;
+    const tempKeyPath = extractKeyPathFromCommand(sshCommand);
+
+    expect(fs.readFileSync(tempKeyPath, 'utf8')).toBe(
+      '-----BEGIN OPENSSH PRIVATE KEY-----\nabc123\n-----END OPENSSH PRIVATE KEY-----\n'
+    );
+
+    cleanup();
+    expect(fs.existsSync(tempKeyPath)).toBe(false);
+  });
 });
 
 describe('cloneOrPullRepository', () => {
