@@ -207,8 +207,12 @@ cat repos/config.json
         ],
         "env_vars": {
             "NODE_ENV": "production",
+            "USE_SSH": "true",
+            "SSH_PRIVATE_KEY_PATH": "/home/deploy/.ssh/id_ed25519",
             "DOPPLER_TOKEN": "YOUR_DOPPLER_TOKEN_HERE"
-        }
+        },
+        "health_check_url": "https://api.acme-org.com/health",
+        "timeout": 300
     },
     "acme-org/frontend": {
         "branch": "master",
@@ -255,20 +259,14 @@ cat repos/config.json
 
 > **Security note:** In this project, `repos/` is git-ignored by default, so local secrets in `repos/config.json` are not committed unless you change ignore rules. Do not put real secrets in tracked boilerplate files such as `app-repos.config.json`; keep those as placeholders and store real values in local `.env` or a secret manager (Doppler, Vault, etc.).
 
-For a ready-to-copy boilerplate covering the most common deployment patterns, see [`app-repos.config.json`](app-repos.config.json). Configuration Options:
+For a ready-to-copy boilerplate covering the most common deployment patterns, see [`app-repos.config.json`](app-repos.config.json). Configuration options:
 
 - `branch`: The branch to deploy from (default: `master`)
 - `commands`: Array of deployment commands to run in sequence; any executable or shell command is accepted (e.g. shell scripts, `curl`, package-manager scripts)
-- `ssh_key_path`: Path to SSH private key file for this repo (overrides global `SSH_PRIVATE_KEY_PATH`)
-- `ssh_key_passphrase`: Passphrase for the per-repo SSH key (if needed)
-- `env_vars`: Environment variables injected into every deployment command for this repository. Use this to pass secrets, set `NODE_OPTIONS`, override `USE_SSH`, or supply per-repo `GITHUB_TOKEN` values.
+- `env_vars`: Environment variables injected into every deployment command for this repository. Use this to pass secrets, override global settings such as `USE_SSH`, `SSH_PRIVATE_KEY_PATH`, `SSH_KEY_PASSPHRASE`, `NODE_OPTIONS`, or supply a per-repo `GITHUB_TOKEN`.
 - `health_check_url`: URL to `GET` after a successful deployment to verify the service is up
 - `timeout`: Per-command timeout in seconds — the process is sent SIGTERM if exceeded
-- `max_retries`: Maximum retry attempts on command failure
-- `retry_delay`: Delay between retries in seconds
 - `github_deployment`: GitHub Deployment reporting block — see [GitHub Deployment Reporting](#github-deployment-reporting)
-
-> **Legacy / ignored fields:** Older config files may contain `package_manager` and `repo_supported_events`. These fields are not read by the current runtime and have no effect — they can be safely removed or left in place.
 
 ## Environment Variables
 
@@ -321,8 +319,8 @@ Variable reference:
 - `WEBHOOK_SECRET`: Secret key for webhook signature verification
 - `MONITORING_SECRET`: Secret key for the `/monitoring` endpoint; leave empty to disable
 - `USE_SSH`: Set to `true` to use SSH for all `git clone/pull` operations (default: `false`; can be overridden per repo via `env_vars`)
-- `SSH_PRIVATE_KEY_PATH`: Global path to SSH private key for private repos (can be overridden per repo via `ssh_key_path`)
-- `SSH_KEY_PASSPHRASE`: Passphrase for the global SSH key (if needed)
+- `SSH_PRIVATE_KEY_PATH`: Global path to SSH private key for private repos (can be overridden per repo via `env_vars`)
+- `SSH_KEY_PASSPHRASE`: Passphrase for the global SSH key if needed (can be overridden per repo via `env_vars`)
 - `SERVER_BASE_URL`: Public base URL of this webhook server (e.g. `https://webhook.your-domain.com`). Used to auto-generate deployment log links — see [GitHub Deployment Reporting](#github-deployment-reporting)
 - `GITHUB_TOKEN`: GitHub token required when `github_deployment.enabled` is `true` for any repository (see [GitHub Deployment Reporting](#github-deployment-reporting))
 

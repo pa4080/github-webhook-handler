@@ -174,7 +174,7 @@ export async function handleWebhook(req: Request, res: Response): Promise<void> 
     const repoDir = path.join(process.cwd(), 'repos', `${owner}_${repoName}`);
 
     logStream?.write(`[git] Cloning/pulling from: ${cloneUrl}\n`);
-    await cloneOrPullRepository(cloneUrl, repoDir, repoConfig);
+    await cloneOrPullRepository(cloneUrl, repoDir);
     console.log(`Successfully pulled latest changes for ${repository}`);
     logStream?.write(`[git] Successfully pulled latest changes\n`);
 

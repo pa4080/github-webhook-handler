@@ -82,8 +82,6 @@ export interface GitHubDeploymentConfig {
 export interface RepoConfig {
   branch: string;
   commands?: string[];
-  ssh_key_path?: string;
-  ssh_key_passphrase?: string;
   env_vars?: Record<string, string>;
   health_check_url?: string;
   /** Maximum time in seconds to wait for each deployment command to finish.
@@ -91,8 +89,6 @@ export interface RepoConfig {
    *  Defaults to no limit when unset.
    */
   timeout?: number;
-  max_retries?: number;
-  retry_delay?: number;
   github_deployment?: GitHubDeploymentConfig;
 }
 

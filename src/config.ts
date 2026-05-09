@@ -2,11 +2,6 @@ import fs from 'fs';
 import path from 'path';
 import { RepoConfig, ReposConfig } from './types';
 
-// SSH configuration
-export const SSH_PRIVATE_KEY_PATH = process.env.SSH_PRIVATE_KEY_PATH || '';
-export const SSH_KEY_PASSPHRASE = process.env.SSH_KEY_PASSPHRASE || undefined;
-
-
 // Set default config to avoid null checks later
 export const DEFAULT_BRANCH = 'master';
 export const DEFAULT_CONFIG: RepoConfig = {
