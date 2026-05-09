@@ -44,25 +44,7 @@ describe('setupGit', () => {
     });
   });
 
-  it('uses SSH_PRIVATE_KEY as a file path when the file exists', () => {
-    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'git-key-path-'));
-    const keyPath = path.join(tempDir, 'id_ed25519');
-    fs.writeFileSync(keyPath, 'key');
-    process.env.SSH_PRIVATE_KEY = keyPath;
-
-    const { cleanup } = setupGit();
-
-    expect(mockEnv).toHaveBeenCalledWith(
-      'GIT_SSH_COMMAND',
-      expect.stringContaining(`ssh -i "${keyPath}"`)
-    );
-
-    cleanup();
-    expect(fs.existsSync(keyPath)).toBe(true);
-    fs.rmSync(tempDir, { recursive: true, force: true });
-  });
-
-  it('uses legacy SSH_PRIVATE_KEY_PATH when provided', () => {
+  it('uses SSH_PRIVATE_KEY_PATH as a direct path to the key file', () => {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'git-key-path-'));
     const keyPath = path.join(tempDir, 'id_ed25519');
     fs.writeFileSync(keyPath, 'key');
@@ -77,6 +59,28 @@ describe('setupGit', () => {
 
     cleanup();
     expect(fs.existsSync(keyPath)).toBe(true);
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  it('SSH_PRIVATE_KEY takes priority over SSH_PRIVATE_KEY_PATH when both are set', () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'git-key-path-'));
+    const keyPath = path.join(tempDir, 'id_ed25519');
+    fs.writeFileSync(keyPath, 'key');
+    process.env.SSH_PRIVATE_KEY_PATH = keyPath;
+    process.env.SSH_PRIVATE_KEY =
+      '-----BEGIN OPENSSH PRIVATE KEY-----\\nabc123\\n-----END OPENSSH PRIVATE KEY-----';
+
+    const { cleanup } = setupGit();
+
+    const sshCommand = mockEnv.mock.calls[0][1] as string;
+    const tempKeyPath = extractKeyPathFromCommand(sshCommand);
+
+    // Should use the temp file from SSH_PRIVATE_KEY, not the path from SSH_PRIVATE_KEY_PATH
+    expect(tempKeyPath).not.toBe(keyPath);
+    expect(fs.existsSync(tempKeyPath)).toBe(true);
+
+    cleanup();
+    expect(fs.existsSync(tempKeyPath)).toBe(false);
     fs.rmSync(tempDir, { recursive: true, force: true });
   });
 

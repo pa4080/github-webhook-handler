@@ -62,7 +62,7 @@ A TypeScript webhook server that listens for GitHub webhook events, pulls reposi
 
    - Use the same approach  and set `MONITORING_SECRET` key. Or leave it empty to disable this functionality. For more details see the section **Monitoring PM2 Endpoint**.
 
-   - Configure SSH for private repositories if needed with `SSH_PRIVATE_KEY` (can be a path or the literal private key value)
+   - Configure SSH for private repositories if needed: use `SSH_PRIVATE_KEY` for the literal key content, or `SSH_PRIVATE_KEY_PATH` for a path to a key file on disk
    - Configure `USE_SSH=true` if you want to clone repositories using SSH instead of HTTPS
    - Set up deployment commands for repositories (optional)
 
@@ -208,7 +208,7 @@ cat repos/config.json
         "env_vars": {
             "NODE_ENV": "production",
             "USE_SSH": "true",
-            "SSH_PRIVATE_KEY": "<path-to-private-key-or-literal-key>",
+            "SSH_PRIVATE_KEY": "-----BEGIN OPENSSH PRIVATE KEY-----\\n...\\n-----END OPENSSH PRIVATE KEY-----",
             "DOPPLER_TOKEN": "<your-doppler-token>"
         },
         "health_check_url": "https://api.acme-org.com/health",
@@ -263,7 +263,7 @@ For a ready-to-copy boilerplate covering the most common deployment patterns, se
 
 - `branch`: The branch to deploy from (default: `master`)
 - `commands`: Array of deployment commands to run in sequence; any executable or shell command is accepted (e.g. shell scripts, `curl`, package-manager scripts)
-- `env_vars`: Environment variables injected into every deployment command for this repository. Use this to pass secrets, override global settings such as `USE_SSH`, `SSH_PRIVATE_KEY`, `SSH_KEY_PASSPHRASE`, `NODE_OPTIONS`, or supply a per-repo `GITHUB_TOKEN`. `SSH_PRIVATE_KEY` may be either a filesystem path or the literal private key content. If you embed the key directly in JSON, escape newlines as `\\n`.
+- `env_vars`: Environment variables injected into every deployment command for this repository. Use this to pass secrets, override global settings such as `USE_SSH`, `SSH_PRIVATE_KEY`, `SSH_PRIVATE_KEY_PATH`, `SSH_KEY_PASSPHRASE`, `NODE_OPTIONS`, or supply a per-repo `GITHUB_TOKEN`. Use `SSH_PRIVATE_KEY` for the literal key content (escape newlines as `\\n` when embedding in JSON) or `SSH_PRIVATE_KEY_PATH` for a path to a key file on disk.
 - `health_check_url`: URL to `GET` after a successful deployment to verify the service is up
 - `timeout`: Per-command timeout in seconds — the process is sent SIGTERM if exceeded
 - `github_deployment`: GitHub Deployment reporting block — see [GitHub Deployment Reporting](#github-deployment-reporting)
@@ -299,10 +299,16 @@ SERVER_BASE_URL="https://webhook.your-domain.com"
 WEBHOOK_URL="http://localhost:3000/webhook"
 
 # SSH Configuration for Private Repositories
-# SSH_PRIVATE_KEY accepts either:
-# 1) a filesystem path to the private key file, or
-# 2) the literal private key content itself
+# Use one of the following (SSH_PRIVATE_KEY takes priority if both are set):
+#
+#   SSH_PRIVATE_KEY      – the literal private key content
+#                          Newlines may be real newlines or escaped as \n
+#
+#   SSH_PRIVATE_KEY_PATH – path to an existing private key file on disk
+#                          e.g. /home/deploy/.ssh/id_ed25519
+#
 SSH_PRIVATE_KEY=
+SSH_PRIVATE_KEY_PATH=
 SSH_KEY_PASSPHRASE=
 
 # GitHub Deployment Reporting (optional)
@@ -322,9 +328,9 @@ Variable reference:
 - `WEBHOOK_SECRET`: Secret key for webhook signature verification
 - `MONITORING_SECRET`: Secret key for the `/monitoring` endpoint; leave empty to disable
 - `USE_SSH`: Set to `true` to use SSH for all `git clone/pull` operations (default: `false`; can be overridden per repo via `env_vars`)
-- `SSH_PRIVATE_KEY`: Global SSH private key setting for private repos; it may be either a filesystem path or the literal private key content (can be overridden per repo via `env_vars`)
-- `SSH_KEY_PASSPHRASE`: Passphrase for the global SSH key if needed (can be overridden per repo via `env_vars`)
-- `SSH_PRIVATE_KEY_PATH`: Legacy alias for path-based SSH key configuration; prefer `SSH_PRIVATE_KEY`
+- `SSH_PRIVATE_KEY`: Literal private key content for SSH authentication; newlines may be real or escaped as `\n` (can be overridden per repo via `env_vars`)
+- `SSH_PRIVATE_KEY_PATH`: Filesystem path to an existing private key file (e.g. `/home/deploy/.ssh/id_ed25519`); `SSH_PRIVATE_KEY` takes priority if both are set (can be overridden per repo via `env_vars`)
+- `SSH_KEY_PASSPHRASE`: Passphrase for the SSH key if needed (can be overridden per repo via `env_vars`)
 - `SERVER_BASE_URL`: Public base URL of this webhook server (e.g. `https://webhook.your-domain.com`). Used to auto-generate deployment log links — see [GitHub Deployment Reporting](#github-deployment-reporting)
 - `GITHUB_TOKEN`: GitHub token required when `github_deployment.enabled` is `true` for any repository (see [GitHub Deployment Reporting](#github-deployment-reporting))
 

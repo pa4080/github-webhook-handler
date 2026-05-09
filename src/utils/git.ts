@@ -8,15 +8,28 @@ type GitSetup = {
   cleanup: () => void;
 };
 
-function resolveSshPrivateKeyFile(): { keyFilePath?: string; cleanup: () => void } {
+/**
+ * Configure and return a SimpleGit instance with SSH support.
+ * SSH settings are read from process.env at call time so that per-repo
+ * env_vars (already merged into process.env by the webhook controller)
+ * are picked up automatically.
+ *
+ * SSH key resolution (first match wins):
+ *   SSH_PRIVATE_KEY      – literal private key content (written to a temp file)
+ *   SSH_PRIVATE_KEY_PATH – filesystem path to an existing private key file
+ */
+export function setupGit(): GitSetup {
+  const git = simpleGit();
+
+  const sshPassphrase = process.env.SSH_KEY_PASSPHRASE;
   const sshPrivateKey = process.env.SSH_PRIVATE_KEY;
-  const legacySshKeyPath = process.env.SSH_PRIVATE_KEY_PATH;
+  const sshPrivateKeyPath = process.env.SSH_PRIVATE_KEY_PATH;
+
+  let keyFilePath: string | undefined;
+  let cleanup = () => {};
 
   if (sshPrivateKey) {
-    if (fs.existsSync(sshPrivateKey)) {
-      return { keyFilePath: sshPrivateKey, cleanup: () => {} };
-    }
-
+    // SSH_PRIVATE_KEY holds the literal key content – write it to a temp file
     const normalizedKey = sshPrivateKey.replace(/\\n/g, '\n');
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'github-webhook-handler-ssh-'));
     const tempKeyPath = path.join(tempDir, 'id_rsa');
@@ -27,39 +40,18 @@ function resolveSshPrivateKeyFile(): { keyFilePath?: string; cleanup: () => void
       { mode: 0o600 }
     );
 
-    return {
-      keyFilePath: tempKeyPath,
-      cleanup: () => {
-        fs.rmSync(tempDir, { recursive: true, force: true });
-      },
+    keyFilePath = tempKeyPath;
+    cleanup = () => {
+      fs.rmSync(tempDir, { recursive: true, force: true });
     };
+  } else if (sshPrivateKeyPath) {
+    // SSH_PRIVATE_KEY_PATH holds a path to an existing key file
+    keyFilePath = sshPrivateKeyPath;
   }
 
-  if (legacySshKeyPath && fs.existsSync(legacySshKeyPath)) {
-    return { keyFilePath: legacySshKeyPath, cleanup: () => {} };
-  }
-
-  return { cleanup: () => {} };
-}
-
-/**
- * Configure and return a SimpleGit instance with SSH support.
- * SSH settings are read from process.env at call time so that per-repo
- * env_vars (already merged into process.env by the webhook controller)
- * are picked up automatically.
- */
-export function setupGit(): GitSetup {
-  const git = simpleGit();
-
-  // Read SSH settings from the environment at call time
-  const sshPassphrase = process.env.SSH_KEY_PASSPHRASE;
-  const { keyFilePath, cleanup } = resolveSshPrivateKeyFile();
-
-  // Configure SSH if a private key is provided
   if (keyFilePath) {
     let sshCommand = `ssh -i "${keyFilePath}" -o StrictHostKeyChecking=accept-new`;
 
-    // Add passphrase if provided
     if (sshPassphrase) {
       sshCommand = `sshpass -p "${sshPassphrase}" ${sshCommand}`;
     }
