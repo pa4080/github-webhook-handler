@@ -207,7 +207,7 @@ cat repos/config.json
         ],
         "env_vars": {
             "NODE_ENV": "production",
-            "DOPPLER_TOKEN": "dp.st.prod.xxxxxxxxxxxx"
+            "DOPPLER_TOKEN": "dp.st.prod.YOUR_TOKEN_HERE"
         }
     },
     "acme-org/frontend": {
@@ -235,7 +235,7 @@ cat repos/config.json
             "NODE_ENV": "production",
             "USE_SSH": "true",
             "NODE_OPTIONS": "--max-old-space-size=4096",
-            "GITHUB_TOKEN": "github_pat_xxxxxxxxxxxxxxxxxxxx"
+            "GITHUB_TOKEN": "github_pat_YOUR_TOKEN_HERE"
         }
     },
     "partner-org/shared-sdk": {
