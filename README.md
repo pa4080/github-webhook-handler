@@ -253,7 +253,7 @@ cat repos/config.json
 }
 ```
 
-> **Security note:** Never commit secrets (API tokens, passwords, private keys) directly in `repos/config.json`. Use environment variable references via `env_vars` keys and keep the actual values in `.env` or a secret manager such as Doppler, Vault, or similar.
+> **Security note:** In this project, `repos/` is git-ignored by default, so local secrets in `repos/config.json` are not committed unless you change ignore rules. Do not put real secrets in tracked boilerplate files such as `app-repos.config.json`; keep those as placeholders and store real values in local `.env` or a secret manager (Doppler, Vault, etc.).
 
 For a ready-to-copy boilerplate covering the most common deployment patterns, see [`app-repos.config.json`](app-repos.config.json). Configuration Options:
 
