@@ -8,7 +8,7 @@ A TypeScript webhook server that listens for GitHub webhook events, pulls reposi
 
 - Built with TypeScript 5.8+ for enhanced type safety and better code organization
 - Structured architecture with controllers, utilities, and properly typed interfaces
-- Listens for GitHub webhook events (push and pull request) on a configurable port
+- Listens for GitHub webhook events (`push`) on a configurable port; automatically acknowledges `ping` events sent by GitHub when a webhook is first created
 - Validates webhook signatures using a secret key for security
 - Pulls repositories from GitHub (supports both public and private repositories via SSH)
 - Executes custom deployment commands after repository updates
@@ -98,7 +98,7 @@ pnpm run start:direct
 **Using PM2 directly:**
 
 ```bash
-pm2 start ecosystem.config.js --env production
+pm2 start ecosystem.config.cjs --env production
 ```
 
 **PM2 commands:**
@@ -151,7 +151,7 @@ This allows you to verify your webhook server is properly handling both push and
 4. Set the Secret to the same value as your `WEBHOOK_SECRET` in the `.env` file (use a secure random string generated from commands in the Installation section above)
    - This shared secret is crucial for verifying the authenticity of webhook requests
    - Always use a strong, random secret and never share it publicly
-5. Select the events you want to trigger the webhook (both "Push" and "Pull requests" events are supported)
+5. Select the events you want to trigger the webhook — choose **"Push"** events (the handler also automatically acknowledges **"Ping"** events that GitHub sends when a webhook is first created; pull request events are not processed)
 6. Enable SSL verification if your server supports HTTPS
 7. Click "Add webhook"
 
@@ -178,7 +178,9 @@ You can trigger this webhook from GitHub Actions using the [Workflow Webhook Act
 
 ## Repository Configuration
 
-All repository configurations are stored in a single file located at `repos/config.json`, Example configuration:
+All repository configurations are stored in a single file located at `repos/config.json`. Each top-level key **must** be the repository's full name in `owner/repo` format — exactly as GitHub reports it in `repository.full_name`. The handler looks up the incoming push event's `repository.full_name` to find the matching entry.
+
+Example configuration with four common patterns:
 
 ```bash
 cat repos/config.json
@@ -186,41 +188,87 @@ cat repos/config.json
 
 ```json
 {
-    "repository.name.1": {
+    "acme-org/website": {
         "branch": "main",
         "commands": [
             "pnpm install",
-            "pnpm docker:deploy"
-        ],
+            "pnpm build",
+            "pnpm docker:build"
+        ]
     },
-    "repository.name.2": {
-        "branch": "main",
-        "repo_supported_events": ["push"],
+    "acme-org/api-server": {
+        "branch": "master",
+        "commands": [
+            "/usr/local/bin/docker-prune.sh",
+            "pnpm docker:build",
+            "pnpm install",
+            "pnpm backup:db",
+            "/usr/local/bin/docker-prune.sh"
+        ],
         "env_vars": {
             "NODE_ENV": "production",
-            "ACCESS_TOKEN": "your-access-token"
+            "DOPPLER_TOKEN": "dp.st.prod.xxxxxxxxxxxx"
+        }
+    },
+    "acme-org/frontend": {
+        "branch": "master",
+        "commands": [
+            "pnpm env:pull",
+            "pnpm i",
+            "pnpm build",
+            "pnpm pm2",
+            "pnpm send-email",
+            "curl https://n8n.internal/webhook/deploy-done"
+        ],
+        "github_deployment": {
+            "enabled": true,
+            "environment": "production",
+            "environment_url": "https://www.acme-org.com",
+            "description": "Deploying acme-org/frontend to self-hosted VPS",
+            "auto_merge": false,
+            "required_contexts": [],
+            "transient_environment": false,
+            "production_environment": true,
+            "fail_deployment_on_status_error": false
         },
+        "env_vars": {
+            "NODE_ENV": "production",
+            "USE_SSH": "true",
+            "NODE_OPTIONS": "--max-old-space-size=4096",
+            "GITHUB_TOKEN": "github_pat_xxxxxxxxxxxxxxxxxxxx"
+        }
+    },
+    "partner-org/shared-sdk": {
+        "branch": "main",
+        "commands": [
+            "cp -f .env.local .env",
+            "pnpm i",
+            "pnpm pm2:deploy"
+        ],
+        "env_vars": {
+            "NODE_ENV": "production",
+            "USE_SSH": "true"
+        }
     }
 }
 ```
 
-For more details see [app-repos.config.json](app-repos.config.json) for an example configuration template. Configuration Options:
+> **Security note:** Never commit secrets (API tokens, passwords, private keys) directly in `repos/config.json`. Use environment variable references via `env_vars` keys and keep the actual values in `.env` or a secret manager such as Doppler, Vault, or similar.
 
-- `branch`: The branch to deploy from (default: main)
-- `command`: Single deployment command to run (deprecated, use `commands` array instead)
-- `commands`: Array of deployment commands to run in sequence
-- `package_manager`: Package manager to use (npm, pnpm, yarn)
-- `ssh_key_path`: Path to SSH private key for private repos
-- `ssh_key_passphrase`: Passphrase for SSH key (if needed)
-- `env_vars`: Environment variables to set for all deployment commands
-- `node_options`: Node.js CLI flags applied via `NODE_OPTIONS` for all deployment child processes (e.g. `"--max-old-space-size=4096"` to raise the heap limit). An explicit `NODE_OPTIONS` in `env_vars` always takes precedence.
-- `pre_deploy_commands`: Commands to run before deployment
-- `post_deploy_commands`: Commands to run after deployment
-- `notifications`: Notification settings (Slack, email)
-- `health_check_url`: URL to check after deployment
+For a full template with every available option, see [app-repos.config.json](app-repos.config.json). Configuration Options:
+
+- `branch`: The branch to deploy from (default: `master`)
+- `commands`: Array of deployment commands to run in sequence; any executable or shell command is accepted (e.g. shell scripts, `curl`, package-manager scripts)
+- `ssh_key_path`: Path to SSH private key file for this repo (overrides global `SSH_PRIVATE_KEY_PATH`)
+- `ssh_key_passphrase`: Passphrase for the per-repo SSH key (if needed)
+- `env_vars`: Environment variables injected into every deployment command for this repository. Use this to pass secrets, set `NODE_OPTIONS`, override `USE_SSH`, or supply per-repo `GITHUB_TOKEN` values.
+- `health_check_url`: URL to `GET` after a successful deployment to verify the service is up
 - `timeout`: Per-command timeout in seconds — the process is sent SIGTERM if exceeded
-- `max_retries`: Maximum retry attempts
+- `max_retries`: Maximum retry attempts on command failure
 - `retry_delay`: Delay between retries in seconds
+- `github_deployment`: GitHub Deployment reporting block — see [GitHub Deployment Reporting](#github-deployment-reporting)
+
+> **Legacy / ignored fields:** Older config files may contain `package_manager` and `repo_supported_events`. These fields are not read by the current runtime and have no effect — they can be safely removed or left in place.
 
 ## Environment Variables
 
@@ -357,7 +405,7 @@ push received → GitHub Deployment created → in_progress
 - Verify signature calculation if you receive 401 Unauthorized errors
 - Ensure any deployment commands are correctly configured in the `.env` file
 - Validate SSH access by manually trying to clone the repository using the same SSH key
-- **Deployment command killed / JavaScript heap out of memory**: A build step (e.g. Next.js) ran out of memory. Add `"node_options": "--max-old-space-size=4096"` (or a higher value) to the repository entry in `repos/config.json` to increase the Node.js heap limit for all deployment commands.
+- **Deployment command killed / JavaScript heap out of memory**: A build step (e.g. Next.js) ran out of memory. Add `"NODE_OPTIONS": "--max-old-space-size=4096"` (or a higher value) inside the `env_vars` block for the repository entry in `repos/config.json` to increase the Node.js heap limit for all deployment commands.
 
 ### GitHub Deployment Reporting Troubleshooting
 
