@@ -178,7 +178,24 @@ You can trigger this webhook from GitHub Actions using the [Workflow Webhook Act
 
 ## Repository Configuration
 
-All repository configurations are stored in a single file located at `repos/config.json`. Each top-level key **must** be the repository's full name in `owner/repo` format — exactly as GitHub reports it in `repository.full_name`. The handler looks up the incoming push event's `repository.full_name` to find the matching entry.
+All repository configurations are stored in a single file located at `repos/config.json` (inside the directory controlled by the `REPOS_DIR` environment variable; defaults to `<app-dir>/repos`). Each top-level key **must** be the repository's full name in `owner/repo` format — exactly as GitHub reports it in `repository.full_name`. The handler looks up the incoming push event's `repository.full_name` to find the matching entry.
+
+Each repository is cloned into a subdirectory of `REPOS_DIR` (or `<app-dir>/repos`) named after the **owner, repository, and configured branch**, separated by underscores:
+
+```
+<repos-dir>/<owner>_<repo-name>_<branch>
+```
+
+For example, if `REPOS_DIR=/var/lib/webhook/repos` and the config contains two entries that target different branches of the same GitHub repository — written as distinct config keys — the handler clones them into separate subdirectories:
+
+| Config key | `branch` value | Checkout directory |
+|---|---|---|
+| `acme-org/website` | `main` | `/var/lib/webhook/repos/acme-org_website_main` |
+| `acme-org/website-staging` | `staging` | `/var/lib/webhook/repos/acme-org_website-staging_staging` |
+
+> **Note:** Because the `config.json` keys must be unique, deploying two different branches of the **same** repository requires separate GitHub webhooks (or a single webhook that routes to two differently named config entries). The branch-qualified directory name ensures each branch always lands in its own isolated directory regardless of how the webhook is set up.
+
+> **Migration note:** Earlier versions of the handler used `<owner>_<repo-name>` (without the branch suffix). If you are upgrading an existing installation, the handler will clone a fresh copy into the new `<owner>_<repo-name>_<branch>` directory on the next webhook event. You can safely remove the old `<owner>_<repo-name>` directory once you have verified the new deployment is working.
 
 Example configuration with four common patterns:
 
@@ -257,7 +274,7 @@ cat repos/config.json
 }
 ```
 
-> **Security note:** In this project, `repos/` is git-ignored by default, so local secrets in `repos/config.json` are not committed unless you change ignore rules. Do not put real secrets in tracked boilerplate files such as `app-repos.config.json`; keep those as placeholders and store real values in local `.env` or a secret manager (Doppler, Vault, etc.).
+> **Security note:** In this project, `repos/` is git-ignored by default, so local secrets in `repos/config.json` are not committed unless you change ignore rules. For extra safety, point `REPOS_DIR` at a directory that is completely outside the webhook app directory so that the app itself stays read-only. Do not put real secrets in tracked boilerplate files such as `app-repos.config.json`; keep those as placeholders and store real values in local `.env` or a secret manager (Doppler, Vault, etc.).
 
 For a ready-to-copy boilerplate covering the most common deployment patterns, see [`app-repos.config.json`](app-repos.config.json). Configuration options:
 
@@ -286,6 +303,14 @@ PORT=3000
 WEBHOOK_SECRET=your_webhook_secret_key_here
 MONITORING_SECRET=your_monitoring_secret_key_here
 USE_SSH=false
+
+# Repositories base directory (optional).
+# When set, cloned repositories and config.json are looked up inside this directory.
+# This is useful for keeping the repos directory outside the webhook app directory,
+# which is safer because the app directory can remain read-only.
+# Absolute path recommended; relative paths are resolved against the app's working directory.
+# Default (when not set): <app-dir>/repos
+#REPOS_DIR=/var/lib/webhook/repos
 
 # Public base URL of this webhook server (used to auto-generate deployment log links).
 # Example: https://webhook.your-domain.com
@@ -327,6 +352,7 @@ Variable reference:
 - `PORT`: Port to listen on (default: 3000)
 - `WEBHOOK_SECRET`: Secret key for webhook signature verification
 - `MONITORING_SECRET`: Secret key for the `/monitoring` endpoint; leave empty to disable
+- `REPOS_DIR`: Absolute path to the directory that holds `config.json` and all cloned repository subdirectories (default: `<app-dir>/repos`). Set this to a path **outside** the webhook app directory to keep the app tree read-only and isolate deployed code from the handler itself.
 - `USE_SSH`: Set to `true` to use SSH for all `git clone/pull` operations (default: `false`; can be overridden per repo via `env_vars`)
 - `SSH_PRIVATE_KEY`: Literal private key content for SSH authentication; newlines may be real or escaped as `\n` (can be overridden per repo via `env_vars`)
 - `SSH_PRIVATE_KEY_PATH`: Filesystem path to an existing private key file (e.g. `/home/deploy/.ssh/id_ed25519`); `SSH_PRIVATE_KEY` takes priority if both are set (can be overridden per repo via `env_vars`)
