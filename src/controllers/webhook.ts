@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import fs from 'fs';
 import path from 'path';
 import { verifySignature } from '../utils/webhook';
-import { getRepoConfig, DEFAULT_BRANCH } from '../config';
+import { getRepoConfig, DEFAULT_BRANCH, getReposDir } from '../config';
 import { cloneOrPullRepository } from '../utils/git';
 import { executeDeployment } from '../utils/deployment';
 import {
@@ -171,10 +171,10 @@ export async function handleWebhook(req: Request, res: Response): Promise<void> 
   try {
     console.log(`Cloning/pulling from: ${cloneUrl}`);
 
-    const repoDir = path.join(process.cwd(), 'repos', `${owner}_${repoName}`);
+    const repoDir = path.join(getReposDir(), `${owner}_${repoName}_${repoConfig.branch}`);
 
     logStream?.write(`[git] Cloning/pulling from: ${cloneUrl}\n`);
-    await cloneOrPullRepository(cloneUrl, repoDir, repoConfig);
+    await cloneOrPullRepository(cloneUrl, repoDir);
     console.log(`Successfully pulled latest changes for ${repository}`);
     logStream?.write(`[git] Successfully pulled latest changes\n`);
 

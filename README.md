@@ -8,7 +8,7 @@ A TypeScript webhook server that listens for GitHub webhook events, pulls reposi
 
 - Built with TypeScript 5.8+ for enhanced type safety and better code organization
 - Structured architecture with controllers, utilities, and properly typed interfaces
-- Listens for GitHub webhook events (push and pull request) on a configurable port
+- Listens for GitHub webhook events (`push`) on a configurable port; automatically acknowledges `ping` events sent by GitHub when a webhook is first created
 - Validates webhook signatures using a secret key for security
 - Pulls repositories from GitHub (supports both public and private repositories via SSH)
 - Executes custom deployment commands after repository updates
@@ -62,7 +62,7 @@ A TypeScript webhook server that listens for GitHub webhook events, pulls reposi
 
    - Use the same approach  and set `MONITORING_SECRET` key. Or leave it empty to disable this functionality. For more details see the section **Monitoring PM2 Endpoint**.
 
-   - Configure SSH key path for private repositories if needed (`SSH_PRIVATE_KEY_PATH`)
+   - Configure SSH for private repositories if needed: use `SSH_PRIVATE_KEY` for the literal key content, or `SSH_PRIVATE_KEY_PATH` for a path to a key file on disk
    - Configure `USE_SSH=true` if you want to clone repositories using SSH instead of HTTPS
    - Set up deployment commands for repositories (optional)
 
@@ -98,7 +98,7 @@ pnpm run start:direct
 **Using PM2 directly:**
 
 ```bash
-pm2 start ecosystem.config.js --env production
+pm2 start ecosystem.config.cjs --env production
 ```
 
 **PM2 commands:**
@@ -151,7 +151,7 @@ This allows you to verify your webhook server is properly handling both push and
 4. Set the Secret to the same value as your `WEBHOOK_SECRET` in the `.env` file (use a secure random string generated from commands in the Installation section above)
    - This shared secret is crucial for verifying the authenticity of webhook requests
    - Always use a strong, random secret and never share it publicly
-5. Select the events you want to trigger the webhook (both "Push" and "Pull requests" events are supported)
+5. Select the events you want to trigger the webhook — choose **"Push"** events (the handler also automatically acknowledges **"Ping"** events that GitHub sends when a webhook is first created; pull request events are not processed)
 6. Enable SSL verification if your server supports HTTPS
 7. Click "Add webhook"
 
@@ -178,7 +178,26 @@ You can trigger this webhook from GitHub Actions using the [Workflow Webhook Act
 
 ## Repository Configuration
 
-All repository configurations are stored in a single file located at `repos/config.json`, Example configuration:
+All repository configurations are stored in a single file located at `repos/config.json` (inside the directory controlled by the `REPOS_DIR` environment variable; defaults to `<app-dir>/repos`). Each top-level key **must** be the repository's full name in `owner/repo` format — exactly as GitHub reports it in `repository.full_name`. The handler looks up the incoming push event's `repository.full_name` to find the matching entry.
+
+Each repository is cloned into a subdirectory of `REPOS_DIR` (or `<app-dir>/repos`) named after the **owner, repository, and configured branch**, separated by underscores:
+
+```
+<repos-dir>/<owner>_<repo-name>_<branch>
+```
+
+For example, if `REPOS_DIR=/var/lib/webhook/repos` and the config contains two entries that target different branches of the same GitHub repository — written as distinct config keys — the handler clones them into separate subdirectories:
+
+| Config key                 | `branch` value | Checkout directory                                        |
+| -------------------------- | -------------- | --------------------------------------------------------- |
+| `acme-org/website`         | `main`         | `/var/lib/webhook/repos/acme-org_website_main`            |
+| `acme-org/website-staging` | `staging`      | `/var/lib/webhook/repos/acme-org_website-staging_staging` |
+
+> **Note:** Because the `config.json` keys must be unique, deploying two different branches of the **same** repository requires separate GitHub webhooks (or a single webhook that routes to two differently named config entries). The branch-qualified directory name ensures each branch always lands in its own isolated directory regardless of how the webhook is set up.
+
+> **Migration note:** Earlier versions of the handler used `<owner>_<repo-name>` (without the branch suffix). If you are upgrading an existing installation, the handler will clone a fresh copy into the new `<owner>_<repo-name>_<branch>` directory on the next webhook event. You can safely remove the old `<owner>_<repo-name>` directory once you have verified the new deployment is working.
+
+Example configuration with four common patterns:
 
 ```bash
 cat repos/config.json
@@ -186,51 +205,156 @@ cat repos/config.json
 
 ```json
 {
-    "repository.name.1": {
+    "acme-org/website": {
         "branch": "main",
         "commands": [
             "pnpm install",
-            "pnpm docker:deploy"
-        ],
+            "pnpm build",
+            "pnpm docker:build"
+        ]
     },
-    "repository.name.2": {
-        "branch": "main",
-        "repo_supported_events": ["push"],
+    "acme-org/api-server": {
+        "branch": "master",
+         "commands": [
+            "pnpm install",
+            "pnpm backup:db",
+            "pnpm docker:build"
+        ],
         "env_vars": {
             "NODE_ENV": "production",
-            "ACCESS_TOKEN": "your-access-token"
+            "USE_SSH": "true",
+            "SSH_PRIVATE_KEY": "<literal-private-key-content-with-\\n-escaped-newlines>",
+            "DOPPLER_TOKEN": "<your-doppler-token>"
         },
+        "health_check_url": "https://api.acme-org.com/health",
+        "timeout": 300
+    },
+    "acme-org/frontend": {
+        "branch": "master",
+        "commands": [
+            "pnpm env:pull",
+            "pnpm i",
+            "pnpm build",
+            "pnpm pm2",
+            "pnpm send-email",
+            "curl https://n8n.internal/webhook/deploy-done"
+        ],
+        "github_deployment": {
+            "enabled": true,
+            "environment": "production",
+            "environment_url": "https://www.acme-org.com",
+            "description": "Deploying acme-org/frontend to self-hosted VPS",
+            "auto_merge": false,
+            "required_contexts": [],
+            "transient_environment": false,
+            "production_environment": true,
+            "fail_deployment_on_status_error": false
+        },
+        "env_vars": {
+            "NODE_ENV": "production",
+            "USE_SSH": "true",
+            "NODE_OPTIONS": "--max-old-space-size=4096",
+            "GITHUB_TOKEN": "<your-github-token>"
+        }
+    },
+    "partner-org/shared-sdk": {
+        "branch": "main",
+        "commands": [
+            "cp -f .env.local .env",
+            "pnpm i",
+            "pnpm pm2:deploy"
+        ],
+        "env_vars": {
+            "NODE_ENV": "production",
+            "USE_SSH": "true"
+        }
     }
 }
 ```
 
-For more details see [app-repos.config.json](app-repos.config.json) for an example configuration template. Configuration Options:
+> **Security note:** In this project, `repos/` is git-ignored by default, so local secrets in `repos/config.json` are not committed unless you change ignore rules. For extra safety, point `REPOS_DIR` at a directory that is completely outside the webhook app directory so that the app itself stays read-only. Do not put real secrets in tracked boilerplate files such as `app-repos.config.json`; keep those as placeholders and store real values in local `.env` or a secret manager (Doppler, Vault, etc.).
 
-- `branch`: The branch to deploy from (default: main)
-- `command`: Single deployment command to run (deprecated, use `commands` array instead)
-- `commands`: Array of deployment commands to run in sequence
-- `package_manager`: Package manager to use (npm, pnpm, yarn)
-- `ssh_key_path`: Path to SSH private key for private repos
-- `ssh_key_passphrase`: Passphrase for SSH key (if needed)
-- `env_vars`: Environment variables to set for all deployment commands
-- `node_options`: Node.js CLI flags applied via `NODE_OPTIONS` for all deployment child processes (e.g. `"--max-old-space-size=4096"` to raise the heap limit). An explicit `NODE_OPTIONS` in `env_vars` always takes precedence.
-- `pre_deploy_commands`: Commands to run before deployment
-- `post_deploy_commands`: Commands to run after deployment
-- `notifications`: Notification settings (Slack, email)
-- `health_check_url`: URL to check after deployment
+For a ready-to-copy boilerplate covering the most common deployment patterns, see [`app-repos.config.json`](app-repos.config.json). Configuration options:
+
+- `branch`: The branch to deploy from (default: `master`)
+- `commands`: Array of deployment commands to run in sequence; any executable or shell command is accepted (e.g. shell scripts, `curl`, package-manager scripts)
+- `env_vars`: Environment variables injected into every deployment command for this repository. Use this to pass secrets, override global settings such as `USE_SSH`, `SSH_PRIVATE_KEY`, `SSH_PRIVATE_KEY_PATH`, `SSH_KEY_PASSPHRASE`, `NODE_OPTIONS`, or supply a per-repo `GITHUB_TOKEN`. Use `SSH_PRIVATE_KEY` for the literal key content (escape newlines as `\\n` when embedding in JSON) or `SSH_PRIVATE_KEY_PATH` for a path to a key file on disk.
+- `health_check_url`: URL to `GET` after a successful deployment to verify the service is up
 - `timeout`: Per-command timeout in seconds — the process is sent SIGTERM if exceeded
-- `max_retries`: Maximum retry attempts
-- `retry_delay`: Delay between retries in seconds
+- `github_deployment`: GitHub Deployment reporting block — see [GitHub Deployment Reporting](#github-deployment-reporting)
 
 ## Environment Variables
 
-The application uses the following environment variables:
+Copy [`sample.env`](sample.env) to `.env` and fill in your values (`.env` is git-ignored and must never be committed):
+
+```bash
+cp sample.env .env
+```
+
+```bash
+cat sample.env
+```
+
+```ini
+# Server Configuration
+PORT=3000
+WEBHOOK_SECRET=your_webhook_secret_key_here
+MONITORING_SECRET=your_monitoring_secret_key_here
+USE_SSH=false
+
+# Repositories base directory (optional).
+# When set, cloned repositories and config.json are looked up inside this directory.
+# This is useful for keeping the repos directory outside the webhook app directory,
+# which is safer because the app directory can remain read-only.
+# Absolute path recommended; relative paths are resolved against the app's working directory.
+# Default (when not set): <app-dir>/repos
+#REPOS_DIR=/var/lib/webhook/repos
+
+# Public base URL of this webhook server (used to auto-generate deployment log links).
+# Example: https://webhook.your-domain.com
+# When set together with MONITORING_SECRET, the GitHub Deployment log_url is automatically
+# built as: ${SERVER_BASE_URL}/monitoring?token=<hmac>&repo=<owner/repo>&ts=<timestamp>
+# The HMAC token is unique per deployment and scoped to the specific repository.
+# You can still override log_url per-repo in repos/config.json github_deployment.log_url.
+SERVER_BASE_URL="https://webhook.your-domain.com"
+
+# Test Webhook Configuration - used by `scripts/test-webhook.sh`
+WEBHOOK_URL="http://localhost:3000/webhook"
+
+# SSH Configuration for Private Repositories
+# Use one of the following (SSH_PRIVATE_KEY takes priority if both are set):
+#
+#   SSH_PRIVATE_KEY      – the literal private key content
+#                          Newlines may be real newlines or escaped as \n
+#
+#   SSH_PRIVATE_KEY_PATH – path to an existing private key file on disk
+#                          e.g. /home/deploy/.ssh/id_ed25519
+#
+SSH_PRIVATE_KEY=
+SSH_PRIVATE_KEY_PATH=
+SSH_KEY_PASSPHRASE=
+
+# GitHub Deployment Reporting (optional)
+# A GitHub token with "Deployments: Read and write" permission is required when
+# github_deployment.enabled is set to true for any repository in repos/config.json.
+# Fine-grained PAT: target repository access + Deployments: Read and write
+# GitHub App:       repository permission Deployments: Read and write
+GITHUB_TOKEN=
+
+# Note: Repository-specific configurations should be placed in the repos/config.json file
+# See app-repos.config.json for an example configuration template
+```
+
+Variable reference:
 
 - `PORT`: Port to listen on (default: 3000)
 - `WEBHOOK_SECRET`: Secret key for webhook signature verification
-- `USE_SSH`: Set to 'true' to use SSH for cloning (default: false)
-- `SSH_PRIVATE_KEY_PATH`: Path to SSH private key for private repos
-- `SSH_KEY_PASSPHRASE`: Passphrase for SSH key (if needed)
+- `MONITORING_SECRET`: Secret key for the `/monitoring` endpoint; leave empty to disable
+- `REPOS_DIR`: Absolute path to the directory that holds `config.json` and all cloned repository subdirectories (default: `<app-dir>/repos`). Set this to a path **outside** the webhook app directory to keep the app tree read-only and isolate deployed code from the handler itself.
+- `USE_SSH`: Set to `true` to use SSH for all `git clone/pull` operations (default: `false`; can be overridden per repo via `env_vars`)
+- `SSH_PRIVATE_KEY`: Literal private key content for SSH authentication; newlines may be real or escaped as `\n` (can be overridden per repo via `env_vars`)
+- `SSH_PRIVATE_KEY_PATH`: Filesystem path to an existing private key file (e.g. `/home/deploy/.ssh/id_ed25519`); `SSH_PRIVATE_KEY` takes priority if both are set (can be overridden per repo via `env_vars`)
+- `SSH_KEY_PASSPHRASE`: Passphrase for the SSH key if needed (can be overridden per repo via `env_vars`)
 - `SERVER_BASE_URL`: Public base URL of this webhook server (e.g. `https://webhook.your-domain.com`). Used to auto-generate deployment log links — see [GitHub Deployment Reporting](#github-deployment-reporting)
 - `GITHUB_TOKEN`: GitHub token required when `github_deployment.enabled` is `true` for any repository (see [GitHub Deployment Reporting](#github-deployment-reporting))
 
@@ -357,7 +481,7 @@ push received → GitHub Deployment created → in_progress
 - Verify signature calculation if you receive 401 Unauthorized errors
 - Ensure any deployment commands are correctly configured in the `.env` file
 - Validate SSH access by manually trying to clone the repository using the same SSH key
-- **Deployment command killed / JavaScript heap out of memory**: A build step (e.g. Next.js) ran out of memory. Add `"node_options": "--max-old-space-size=4096"` (or a higher value) to the repository entry in `repos/config.json` to increase the Node.js heap limit for all deployment commands.
+- **Deployment command killed / JavaScript heap out of memory**: A build step (e.g. Next.js) ran out of memory. Add `"NODE_OPTIONS": "--max-old-space-size=4096"` (or a higher value) inside the `env_vars` block for the repository entry in `repos/config.json` to increase the Node.js heap limit for all deployment commands.
 
 ### GitHub Deployment Reporting Troubleshooting
 

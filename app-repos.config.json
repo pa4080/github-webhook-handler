@@ -1,38 +1,54 @@
 {
-  "owner/exact-repository.name": {
+  "acme-org/website": {
     "branch": "main",
-    "commands": [
-      "pnpm install",
-      "pnpm build",
-      "pnpm docker:build",
-      "pnpm docker:deploy"
-    ],
-    "package_manager": "pnpm",
-    "ssh_key_path": "/path/to/your/ssh/private/key",
-    "ssh_key_passphrase": "optional_passphrase_if_your_key_has_one",
+    "commands": ["pnpm install", "pnpm build", "pnpm docker:build"]
+  },
+  "acme-org/api-server": {
+    "branch": "master",
+    "commands": ["pnpm install", "pnpm backup:db", "pnpm docker:build"],
     "env_vars": {
       "NODE_ENV": "production",
-      "PORT": "3000",
-      "NODE_OPTIONS": "--max-old-space-size=4096"
+      "USE_SSH": "true",
+      "SSH_PRIVATE_KEY": "<literal-private-key-content-with-\\n-escaped-newlines>",
+      "DOPPLER_TOKEN": "<your-doppler-token>"
     },
-    "notifications": {
-      "slack_webhook": "https://hooks.slack.com/services/...",
-      "email": "devops@example.com"
-    },
-    "health_check_url": "https://example.com/health",
-    "timeout": 300,
-    "max_retries": 3,
-    "retry_delay": 30,
+    "health_check_url": "https://api.acme-org.com/health",
+    "timeout": 300
+  },
+  "acme-org/frontend": {
+    "branch": "master",
+    "commands": [
+      "pnpm env:pull",
+      "pnpm i",
+      "pnpm build",
+      "pnpm pm2",
+      "pnpm send-email",
+      "curl https://n8n.internal/webhook/deploy-done"
+    ],
     "github_deployment": {
       "enabled": true,
       "environment": "production",
-      "environment_url": "https://your-deployed-app-domain.com",
-      "description": "Deploying to self-hosted VPS",
+      "environment_url": "https://www.acme-org.com",
+      "description": "Deploying acme-org/frontend to self-hosted VPS",
       "auto_merge": false,
       "required_contexts": [],
       "transient_environment": false,
       "production_environment": true,
       "fail_deployment_on_status_error": false
+    },
+    "env_vars": {
+      "NODE_ENV": "production",
+      "USE_SSH": "true",
+      "NODE_OPTIONS": "--max-old-space-size=4096",
+      "GITHUB_TOKEN": "<your-github-token>"
+    }
+  },
+  "partner-org/shared-sdk": {
+    "branch": "main",
+    "commands": ["cp -f .env.local .env", "pnpm i", "pnpm pm2:deploy"],
+    "env_vars": {
+      "NODE_ENV": "production",
+      "USE_SSH": "true"
     }
   }
 }
