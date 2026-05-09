@@ -255,7 +255,7 @@ cat repos/config.json
 
 > **Security note:** Never commit secrets (API tokens, passwords, private keys) directly in `repos/config.json`. Use environment variable references via `env_vars` keys and keep the actual values in `.env` or a secret manager such as Doppler, Vault, or similar.
 
-For a full template with every available option, see [app-repos.config.json](app-repos.config.json). Configuration Options:
+For a ready-to-copy boilerplate covering the most common deployment patterns, see [`app-repos.config.json`](app-repos.config.json). Configuration Options:
 
 - `branch`: The branch to deploy from (default: `master`)
 - `commands`: Array of deployment commands to run in sequence; any executable or shell command is accepted (e.g. shell scripts, `curl`, package-manager scripts)
@@ -272,13 +272,57 @@ For a full template with every available option, see [app-repos.config.json](app
 
 ## Environment Variables
 
-The application uses the following environment variables:
+Copy [`sample.env`](sample.env) to `.env` and fill in your values (`.env` is git-ignored and must never be committed):
+
+```bash
+cp sample.env .env
+```
+
+```bash
+cat sample.env
+```
+
+```ini
+# Server Configuration
+PORT=3000
+WEBHOOK_SECRET=your_webhook_secret_key_here
+MONITORING_SECRET=your_monitoring_secret_key_here
+USE_SSH=false
+
+# Public base URL of this webhook server (used to auto-generate deployment log links).
+# Example: https://webhook.your-domain.com
+# When set together with MONITORING_SECRET, the GitHub Deployment log_url is automatically
+# built as: ${SERVER_BASE_URL}/monitoring?token=<hmac>&repo=<owner/repo>&ts=<timestamp>
+# The HMAC token is unique per deployment and scoped to the specific repository.
+# You can still override log_url per-repo in repos/config.json github_deployment.log_url.
+SERVER_BASE_URL="https://webhook.your-domain.com"
+
+# Test Webhook Configuration - used by `scripts/test-webhook.sh`
+WEBHOOK_URL="http://localhost:3000/webhook"
+
+# SSH Configuration for Private Repositories
+SSH_PRIVATE_KEY_PATH=
+SSH_KEY_PASSPHRASE=
+
+# GitHub Deployment Reporting (optional)
+# A GitHub token with "Deployments: Read and write" permission is required when
+# github_deployment.enabled is set to true for any repository in repos/config.json.
+# Fine-grained PAT: target repository access + Deployments: Read and write
+# GitHub App:       repository permission Deployments: Read and write
+GITHUB_TOKEN=
+
+# Note: Repository-specific configurations should be placed in the repos/config.json file
+# See app-repos.config.json for an example configuration template
+```
+
+Variable reference:
 
 - `PORT`: Port to listen on (default: 3000)
 - `WEBHOOK_SECRET`: Secret key for webhook signature verification
-- `USE_SSH`: Set to 'true' to use SSH for cloning (default: false)
-- `SSH_PRIVATE_KEY_PATH`: Path to SSH private key for private repos
-- `SSH_KEY_PASSPHRASE`: Passphrase for SSH key (if needed)
+- `MONITORING_SECRET`: Secret key for the `/monitoring` endpoint; leave empty to disable
+- `USE_SSH`: Set to `true` to use SSH for all `git clone/pull` operations (default: `false`; can be overridden per repo via `env_vars`)
+- `SSH_PRIVATE_KEY_PATH`: Global path to SSH private key for private repos (can be overridden per repo via `ssh_key_path`)
+- `SSH_KEY_PASSPHRASE`: Passphrase for the global SSH key (if needed)
 - `SERVER_BASE_URL`: Public base URL of this webhook server (e.g. `https://webhook.your-domain.com`). Used to auto-generate deployment log links — see [GitHub Deployment Reporting](#github-deployment-reporting)
 - `GITHUB_TOKEN`: GitHub token required when `github_deployment.enabled` is `true` for any repository (see [GitHub Deployment Reporting](#github-deployment-reporting))
 

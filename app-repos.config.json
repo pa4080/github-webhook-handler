@@ -17,7 +17,6 @@
       "/usr/local/bin/docker-prune.sh"
     ],
     "ssh_key_path": "/home/deploy/.ssh/id_ed25519",
-    "ssh_key_passphrase": "",
     "env_vars": {
       "NODE_ENV": "production",
       "DOPPLER_TOKEN": "dp.st.prod.YOUR_TOKEN_HERE"
