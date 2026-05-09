@@ -42,7 +42,11 @@ export function setupGit(): GitSetup {
 
     keyFilePath = tempKeyPath;
     cleanup = () => {
-      fs.rmSync(tempDir, { recursive: true, force: true });
+      try {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      } catch (err) {
+        console.error('[git] Failed to remove temporary SSH key directory:', err);
+      }
     };
   } else if (sshPrivateKeyPath) {
     // SSH_PRIVATE_KEY_PATH holds a path to an existing key file

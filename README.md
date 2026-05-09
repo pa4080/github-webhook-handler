@@ -208,7 +208,7 @@ cat repos/config.json
         "env_vars": {
             "NODE_ENV": "production",
             "USE_SSH": "true",
-            "SSH_PRIVATE_KEY": "-----BEGIN OPENSSH PRIVATE KEY-----\\n...\\n-----END OPENSSH PRIVATE KEY-----",
+            "SSH_PRIVATE_KEY": "<literal-private-key-content-with-\\n-escaped-newlines>",
             "DOPPLER_TOKEN": "<your-doppler-token>"
         },
         "health_check_url": "https://api.acme-org.com/health",
