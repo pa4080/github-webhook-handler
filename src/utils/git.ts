@@ -85,7 +85,7 @@ export async function cloneOrPullRepository(repoUrl: string, targetDir: string):
 
   try {
     // Check if repository exists
-    if (fs.existsSync(`${targetDir}/.git`)) {
+    if (fs.existsSync(path.join(targetDir, '.git'))) {
       console.log('Repository exists, pulling latest changes');
       await git.cwd(targetDir).pull();
     } else {
