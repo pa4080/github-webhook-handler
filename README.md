@@ -208,8 +208,8 @@ cat repos/config.json
         "env_vars": {
             "NODE_ENV": "production",
             "USE_SSH": "true",
-            "SSH_PRIVATE_KEY": "/home/deploy/.ssh/id_ed25519",
-            "DOPPLER_TOKEN": "YOUR_DOPPLER_TOKEN_HERE"
+            "SSH_PRIVATE_KEY": "<path-to-private-key-or-literal-key>",
+            "DOPPLER_TOKEN": "<your-doppler-token>"
         },
         "health_check_url": "https://api.acme-org.com/health",
         "timeout": 300
@@ -239,7 +239,7 @@ cat repos/config.json
             "NODE_ENV": "production",
             "USE_SSH": "true",
             "NODE_OPTIONS": "--max-old-space-size=4096",
-            "GITHUB_TOKEN": "YOUR_GITHUB_TOKEN_HERE"
+            "GITHUB_TOKEN": "<your-github-token>"
         }
     },
     "partner-org/shared-sdk": {
@@ -263,7 +263,7 @@ For a ready-to-copy boilerplate covering the most common deployment patterns, se
 
 - `branch`: The branch to deploy from (default: `master`)
 - `commands`: Array of deployment commands to run in sequence; any executable or shell command is accepted (e.g. shell scripts, `curl`, package-manager scripts)
-- `env_vars`: Environment variables injected into every deployment command for this repository. Use this to pass secrets, override global settings such as `USE_SSH`, `SSH_PRIVATE_KEY`, `SSH_KEY_PASSPHRASE`, `NODE_OPTIONS`, or supply a per-repo `GITHUB_TOKEN`. `SSH_PRIVATE_KEY` may be either a filesystem path or the literal private key content.
+- `env_vars`: Environment variables injected into every deployment command for this repository. Use this to pass secrets, override global settings such as `USE_SSH`, `SSH_PRIVATE_KEY`, `SSH_KEY_PASSPHRASE`, `NODE_OPTIONS`, or supply a per-repo `GITHUB_TOKEN`. `SSH_PRIVATE_KEY` may be either a filesystem path or the literal private key content. If you embed the key directly in JSON, escape newlines as `\\n`.
 - `health_check_url`: URL to `GET` after a successful deployment to verify the service is up
 - `timeout`: Per-command timeout in seconds — the process is sent SIGTERM if exceeded
 - `github_deployment`: GitHub Deployment reporting block — see [GitHub Deployment Reporting](#github-deployment-reporting)

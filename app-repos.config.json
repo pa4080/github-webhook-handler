@@ -19,8 +19,8 @@
     "env_vars": {
       "NODE_ENV": "production",
       "USE_SSH": "true",
-      "SSH_PRIVATE_KEY": "/home/deploy/.ssh/id_ed25519",
-      "DOPPLER_TOKEN": "YOUR_DOPPLER_TOKEN_HERE"
+      "SSH_PRIVATE_KEY": "<path-to-private-key-or-literal-key>",
+      "DOPPLER_TOKEN": "<your-doppler-token>"
     },
     "health_check_url": "https://api.acme-org.com/health",
     "timeout": 300
@@ -50,7 +50,7 @@
       "NODE_ENV": "production",
       "USE_SSH": "true",
       "NODE_OPTIONS": "--max-old-space-size=4096",
-      "GITHUB_TOKEN": "YOUR_GITHUB_TOKEN_HERE"
+      "GITHUB_TOKEN": "<your-github-token>"
     }
   },
   "partner-org/shared-sdk": {
