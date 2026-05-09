@@ -19,7 +19,7 @@
     "env_vars": {
       "NODE_ENV": "production",
       "USE_SSH": "true",
-      "SSH_PRIVATE_KEY_PATH": "/home/deploy/.ssh/id_ed25519",
+      "SSH_PRIVATE_KEY": "/home/deploy/.ssh/id_ed25519",
       "DOPPLER_TOKEN": "YOUR_DOPPLER_TOKEN_HERE"
     },
     "health_check_url": "https://api.acme-org.com/health",

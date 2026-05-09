@@ -1,5 +1,46 @@
 import simpleGit, { SimpleGit } from 'simple-git';
 import fs from 'fs';
+import os from 'os';
+import path from 'path';
+
+type GitSetup = {
+  git: SimpleGit;
+  cleanup: () => void;
+};
+
+function resolveSshPrivateKeyFile(): { keyFilePath?: string; cleanup: () => void } {
+  const sshPrivateKey = process.env.SSH_PRIVATE_KEY;
+  const legacySshKeyPath = process.env.SSH_PRIVATE_KEY_PATH;
+
+  if (sshPrivateKey) {
+    if (fs.existsSync(sshPrivateKey)) {
+      return { keyFilePath: sshPrivateKey, cleanup: () => {} };
+    }
+
+    const normalizedKey = sshPrivateKey.replace(/\\n/g, '\n');
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'github-webhook-handler-ssh-'));
+    const tempKeyPath = path.join(tempDir, 'id_rsa');
+
+    fs.writeFileSync(
+      tempKeyPath,
+      normalizedKey.endsWith('\n') ? normalizedKey : `${normalizedKey}\n`,
+      { mode: 0o600 }
+    );
+
+    return {
+      keyFilePath: tempKeyPath,
+      cleanup: () => {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      },
+    };
+  }
+
+  if (legacySshKeyPath && fs.existsSync(legacySshKeyPath)) {
+    return { keyFilePath: legacySshKeyPath, cleanup: () => {} };
+  }
+
+  return { cleanup: () => {} };
+}
 
 /**
  * Configure and return a SimpleGit instance with SSH support.
@@ -7,16 +48,16 @@ import fs from 'fs';
  * env_vars (already merged into process.env by the webhook controller)
  * are picked up automatically.
  */
-export function setupGit(): SimpleGit {
+export function setupGit(): GitSetup {
   const git = simpleGit();
 
   // Read SSH settings from the environment at call time
-  const sshKeyPath = process.env.SSH_PRIVATE_KEY_PATH || '';
   const sshPassphrase = process.env.SSH_KEY_PASSPHRASE;
+  const { keyFilePath, cleanup } = resolveSshPrivateKeyFile();
 
   // Configure SSH if a private key is provided
-  if (sshKeyPath && fs.existsSync(sshKeyPath)) {
-    let sshCommand = `ssh -i ${sshKeyPath} -o StrictHostKeyChecking=no`;
+  if (keyFilePath) {
+    let sshCommand = `ssh -i "${keyFilePath}" -o StrictHostKeyChecking=no`;
 
     // Add passphrase if provided
     if (sshPassphrase) {
@@ -26,7 +67,7 @@ export function setupGit(): SimpleGit {
     git.env('GIT_SSH_COMMAND', sshCommand);
   }
 
-  return git;
+  return { git, cleanup };
 }
 
 /**
@@ -35,7 +76,7 @@ export function setupGit(): SimpleGit {
  * @param targetDir Target directory for the repository
  */
 export async function cloneOrPullRepository(repoUrl: string, targetDir: string): Promise<void> {
-  const git = setupGit();
+  const { git, cleanup } = setupGit();
 
   // Create directory if it doesn't exist
   if (!fs.existsSync(targetDir)) {
@@ -54,6 +95,7 @@ export async function cloneOrPullRepository(repoUrl: string, targetDir: string):
   } catch (error) {
     console.error('Error cloning/pulling repository:', error);
     throw error;
+  } finally {
+    cleanup();
   }
 }
-
