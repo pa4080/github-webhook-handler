@@ -108,7 +108,14 @@ export async function handleWebhook(req: Request, res: Response): Promise<void> 
   }
 
   // Get repository-specific configuration
-  let repoConfig = getRepoConfig(repository);
+  let repoConfig: RepoConfig;
+  try {
+    repoConfig = getRepoConfig(repository, branch);
+  } catch (error) {
+    console.error('Configuration error:', error instanceof Error ? error.message : String(error));
+    res.status(500).send('Internal configuration error');
+    return;
+  }
   console.log(`Config in use for ${repository}:`, repoConfig);
 
   process.env = { ...process.env, ...repoConfig?.env_vars };

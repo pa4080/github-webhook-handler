@@ -27,18 +27,39 @@ export function getReposDir(): string {
   return path.join(process.cwd(), 'repos');
 }
 
-export function getRepoConfig(repoName: string): RepoConfig {
+export function getRepoConfig(repoName: string, branch?: string): RepoConfig {
   const configPath = path.join(getReposDir(), 'config.json');
 
   try {
     if (fs.existsSync(configPath)) {
       const config = JSON.parse(fs.readFileSync(configPath, 'utf-8')) as ReposConfig;
-      return !!config[repoName] ? { ...DEFAULT_CONFIG, ...config[repoName] } : DEFAULT_CONFIG;
+      const entry = config[repoName];
+
+      if (!entry) {
+        return DEFAULT_CONFIG;
+      }
+
+      // If the entry is an array, find the entry that matches the branch
+      if (Array.isArray(entry)) {
+        if (!branch) {
+          throw new Error(`Config for "${repoName}" is an array but no branch was provided`);
+        }
+        const match = entry.find(e => e.branch === branch);
+        if (!match) {
+          console.log(`No array config entry found for ${repoName} branch "${branch}" — skipping`);
+          return DEFAULT_CONFIG;
+        }
+        return { ...DEFAULT_CONFIG, ...match };
+      }
+
+      // Single object config (backward compatibility)
+      return { ...DEFAULT_CONFIG, ...entry };
     }
     return DEFAULT_CONFIG;
   } catch (error) {
-    console.error(`Error reading config for ${repoName}:`, error);
-    return DEFAULT_CONFIG;
+    // Re-throw intentional errors (e.g. misconfigured array entry without branch)
+    // and propagate unexpected I/O / parse errors to the caller.
+    throw error;
   }
 }
 

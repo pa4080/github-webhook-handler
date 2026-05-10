@@ -50,5 +50,47 @@
       "NODE_ENV": "production",
       "USE_SSH": "true"
     }
-  }
+  },
+  "acme-org/multi-branch-app": [
+    {
+      "branch": "main",
+      "commands": ["pnpm env:pull", "pnpm i", "pnpm build", "pnpm pm2"],
+      "github_deployment": {
+        "enabled": true,
+        "environment": "Production",
+        "environment_url": "https://www.acme-org.com",
+        "description": "Deploying acme-org/multi-branch-app to production",
+        "auto_merge": false,
+        "required_contexts": [],
+        "transient_environment": false,
+        "production_environment": true,
+        "fail_deployment_on_status_error": false
+      },
+      "env_vars": {
+        "NODE_ENV": "production",
+        "USE_SSH": "true",
+        "GITHUB_TOKEN": "<your-github-token>"
+      }
+    },
+    {
+      "branch": "staging",
+      "commands": ["pnpm env:pull", "pnpm i", "pnpm build", "pnpm pm2:staging"],
+      "github_deployment": {
+        "enabled": true,
+        "environment": "Staging",
+        "environment_url": "https://staging.acme-org.com",
+        "description": "Deploying acme-org/multi-branch-app to staging",
+        "auto_merge": false,
+        "required_contexts": [],
+        "transient_environment": true,
+        "production_environment": false,
+        "fail_deployment_on_status_error": false
+      },
+      "env_vars": {
+        "NODE_ENV": "staging",
+        "USE_SSH": "true",
+        "GITHUB_TOKEN": "<your-github-token>"
+      }
+    }
+  ]
 }

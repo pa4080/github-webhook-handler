@@ -186,16 +186,23 @@ Each repository is cloned into a subdirectory of `REPOS_DIR` (or `<app-dir>/repo
 <repos-dir>/<owner>_<repo-name>_<branch>
 ```
 
-For example, if `REPOS_DIR=/var/lib/webhook/repos` and the config contains two entries that target different branches of the same GitHub repository — written as distinct config keys — the handler clones them into separate subdirectories:
+To deploy **multiple branches of the same repository**, set the config value to an **array** of config objects — one per branch. The key remains the exact `owner/repo` name GitHub reports, and the handler picks the array entry whose `branch` field matches the incoming push event:
 
-| Config key                 | `branch` value | Checkout directory                                        |
-| -------------------------- | -------------- | --------------------------------------------------------- |
-| `acme-org/website`         | `main`         | `/var/lib/webhook/repos/acme-org_website_main`            |
-| `acme-org/website-staging` | `staging`      | `/var/lib/webhook/repos/acme-org_website-staging_staging` |
+```json
+"acme-org/website": [
+  { "branch": "main",    "commands": ["pnpm build"] },
+  { "branch": "staging", "commands": ["pnpm build:staging"] }
+]
+```
 
-> **Note:** Because the `config.json` keys must be unique, deploying two different branches of the **same** repository requires separate GitHub webhooks (or a single webhook that routes to two differently named config entries). The branch-qualified directory name ensures each branch always lands in its own isolated directory regardless of how the webhook is set up.
+Each branch is always cloned into its own isolated directory:
 
-> **Migration note:** Earlier versions of the handler used `<owner>_<repo-name>` (without the branch suffix). If you are upgrading an existing installation, the handler will clone a fresh copy into the new `<owner>_<repo-name>_<branch>` directory on the next webhook event. You can safely remove the old `<owner>_<repo-name>` directory once you have verified the new deployment is working.
+| Config key         | `branch` value | Checkout directory                                |
+| ------------------ | -------------- | ------------------------------------------------- |
+| `acme-org/website` | `main`         | `/var/lib/webhook/repos/acme-org_website_main`    |
+| `acme-org/website` | `staging`      | `/var/lib/webhook/repos/acme-org_website_staging` |
+
+Single-object entries remain fully supported — use them when you only deploy one branch per repository.
 
 Example configuration with four common patterns:
 
@@ -268,13 +275,25 @@ cat repos/config.json
             "NODE_ENV": "production",
             "USE_SSH": "true"
         }
-    }
+    },
+    "acme-org/multi-branch-app": [
+        {
+            "branch": "main",
+            "commands": ["pnpm env:pull", "pnpm i", "pnpm build", "pnpm pm2"],
+            "env_vars": { "NODE_ENV": "production", "USE_SSH": "true" }
+        },
+        {
+            "branch": "staging",
+            "commands": ["pnpm env:pull", "pnpm i", "pnpm build", "pnpm pm2:staging"],
+            "env_vars": { "NODE_ENV": "staging", "USE_SSH": "true" }
+        }
+    ]
 }
 ```
 
-> **Security note:** In this project, `repos/` is git-ignored by default, so local secrets in `repos/config.json` are not committed unless you change ignore rules. For extra safety, point `REPOS_DIR` at a directory that is completely outside the webhook app directory so that the app itself stays read-only. Do not put real secrets in tracked boilerplate files such as `app-repos.config.json`; keep those as placeholders and store real values in local `.env` or a secret manager (Doppler, Vault, etc.).
+> **Security note:** In this project, `repos/` is git-ignored by default, so local secrets in `repos/config.json` are not committed unless you change ignore rules. For extra safety, point `REPOS_DIR` at a directory that is completely outside the webhook app directory so that the app itself stays read-only. Do not put real secrets in tracked boilerplate files such as `sample.config.json`; keep those as placeholders and store real values in local `.env` or a secret manager (Doppler, Vault, etc.).
 
-For a ready-to-copy boilerplate covering the most common deployment patterns, see [`app-repos.config.json`](app-repos.config.json). Configuration options:
+For a ready-to-copy boilerplate covering the most common deployment patterns, see [`sample.config.json`](sample.config.json). Configuration options:
 
 - `branch`: The branch to deploy from (default: `master`)
 - `commands`: Array of deployment commands to run in sequence; any executable or shell command is accepted (e.g. shell scripts, `curl`, package-manager scripts)

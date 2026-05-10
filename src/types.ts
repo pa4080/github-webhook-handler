@@ -93,5 +93,5 @@ export interface RepoConfig {
 }
 
 export interface ReposConfig {
-  [repository: string]: RepoConfig;
+  [repository: string]: RepoConfig | RepoConfig[];
 }
