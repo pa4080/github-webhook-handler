@@ -407,6 +407,17 @@ Set the `GITHUB_TOKEN` environment variable to a token with **Deployments: Read 
 
 If `github_deployment.enabled` is `false` for every repository, no token is required.
 
+### Step-by-step guide to generate the GitHub token
+
+As a best practice, you should create separate access tokens for each project. Also, note that organization tokens have an enforced expiration period.
+
+1. Go to GitHub.com and log in.
+2. Click on your Profile photo in the top-right corner of the page.
+3. Click on Settings from the dropdown menu.
+4. On the left sidebar, scroll all the way to the bottom and click on < > Developer settings.
+5. In the left sidebar, under Personal access tokens, click on Fine-grained tokens.
+6. Click the Generate new token button in the top right (you may be asked to re-enter your password or authenticate).
+
 ### Automatic deployment log URL
 
 When GitHub Deployment reporting is enabled the handler can automatically populate the **log URL** — the link shown on GitHub's Deployments page that takes you straight to the deployment logs. No per-repository configuration is needed: just set two environment variables in `.env`:
